@@ -161,6 +161,8 @@ class SEM:
         # as a function of frame resolution and pixel size (in nm):
         # M = MAG_PX_SIZE_FACTOR / (STORE_RES_X * PX_SIZE)
         self.MAG_PX_SIZE_FACTOR = int(self.syscfg['sem']['mag_px_size_factor'])
+        # For SEMs that do not support the user providing a filename
+        self.FIXED_FILENAME = self.syscfg['sem']['fixed_filename']
 
     def save_to_cfg(self):
         """Save current values of attributes to config and sysconfig objects."""
@@ -326,14 +328,24 @@ class SEM:
         # Setting SEM to target aperture size must be implemented in child class!
 
     def apply_beam_settings(self):
-        """Set the SEM to the current target EHT voltage and beam current."""
-        raise NotImplementedError
+        """
+        Set the SEM to the current target EHT voltage and beam current.
+        """
+        ret_val1 = self.set_eht(self.target_eht)
+        ret_val2 = self.set_beam_current(self.target_beam_current)
+        ret_val3 = self.set_aperture_size(self.APERTURE_SIZE.index(self.target_aperture_size))
+        ret_val4 = self.set_high_current(self.target_high_current)
+        return (ret_val1 and ret_val2 and ret_val3 and ret_val4)
 
     def apply_grab_settings(self):
-        """Set the SEM to the current grab settings (stored in
+        """
+        Set the SEM to the current grab settings (stored in
         self.grab_dwell_time, self.grab_pixel_size, and
-        self.grab_frame_size_selector)."""
-        raise NotImplementedError
+        self.grab_frame_size_selector).
+        """
+        self.apply_frame_settings(self.grab_frame_size_selector,
+                                  self.grab_pixel_size,
+                                  self.grab_dwell_time)
 
     def apply_frame_settings(self, frame_size_selector, pixel_size, dwell_time):
         """Set SEM to the specified frame settings (frame size, pixel size and

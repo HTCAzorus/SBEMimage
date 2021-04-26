@@ -45,6 +45,7 @@ from utils import Error
 from sem_control_zeiss import SEM_SmartSEM, SEM_MultiSEM
 from sem_control_fei import SEM_Quanta
 from sem_control_tescan import SEM_SharkSEM
+from sem_control_hitachi import SEM_SU7000
 from microtome_control_gatan import Microtome_3View
 from microtome_control_katana import Microtome_katana
 from microtome_control_gcib import GCIB
@@ -157,6 +158,15 @@ class MainControls(QMainWindow):
                     self, 'Error initializing TESCAN SharkSEM API',
                     'TESCAN SharkSEM API could not be initialized / '
                     'connection to SEM failed.'
+                    '\nSBEMimage will be run in simulation mode.',
+                    QMessageBox.Ok)
+                self.simulation_mode = True
+        elif self.syscfg['device']['sem'].endswith('SU7000'):
+            self.sem = SEM_SU7000(self.cfg, self.syscfg)
+            if self.sem.error_state != Error.none:
+                QMessageBox.warning(
+                    self, 'Error initializing Hitachi High-tech SU7000 via HTC `hihi` module',
+                    'connection to SEM failed or `hihi` not installed.'
                     '\nSBEMimage will be run in simulation mode.',
                     QMessageBox.Ok)
                 self.simulation_mode = True

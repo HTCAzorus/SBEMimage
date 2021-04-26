@@ -150,6 +150,9 @@ class Error(Enum):
     multisem_alignment = 903
     multisem_failed_to_write = 904
 
+    # Hitachi SU7000
+    hihi_connect = 2001
+
 
 Errors = {
     Error.none: 'No error',
