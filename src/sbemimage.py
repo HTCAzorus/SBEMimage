@@ -20,9 +20,10 @@ QMainWindow MainControls (in main_controls.py) is launched.
 
 Use 'python sbemimage.py' or call the batch file SBEMimage.bat to run SBEMimage.
 """
-
+from typing import Tuple
 import os
 import sys
+import argparse
 
 # Required for version installed with pynsist installer
 if os.path.exists('..\\Python') and os.path.exists('..\\pkgs'):
@@ -74,6 +75,10 @@ def main():
     Quit if default.ini can't be found, or if user/system configuration cannot
     be loaded.
     """
+    try:
+        sbem_cfg_dir = os.environ['SBEMIMAGE_CONFIG_DIR']
+    except KeyError:
+        sbem_cfg_dir = '../cfg'
 
     utils.logging_init('CTRL', '***** New SBEMimage session *****')
 
@@ -82,7 +87,7 @@ def main():
             and platform.release() in ['7', '10']):
         print('This version of SBEMimage requires Windows 7 or 10. '
               'Program aborted.\n')
-        os.system('cmd /k')  # keep console window open
+        # os.system('cmd /k')  # keep console window open
         sys.exit()
 
     if platform.release() == '10':
@@ -111,93 +116,69 @@ def main():
           f'     {version_info}\n'
           f'{line_of_stars}\n')
 
-    configuration_loaded = False
     default_configuration = False
     presets_loaded = False
+    device_presets_selection = [None, None]
 
-    if (os.path.isfile('..\\cfg\\default.ini')
-            and os.path.isfile('..\\cfg\\system.cfg')):
+    # Load command-line arguments
+    # ---------------------------
+    parser = argparse.ArgumentParser(description='Load SBEMImage configuration via command-line.')
+    parser.add_argument('--ini', '-i', dest='ini')
+    options = parser.parse_args()
+    
+    if options.ini:
+        # Command-line argument found, load the provided configuration file.
+        if os.path.isfile(options.ini):
+            config_file = options.ini
+        elif os.path.isfile(os.path.join(sbem_cfg_dir, options.ini)):
+            config_file = os.path.join(sbem_cfg_dir, options.ini)
+        else:
+            raise ValueError(f'File {options.ini} not found in working directory or SBEM_CONFIG_DIR environment variable directory.')
+        default_configuration, config, sysconfig = _load_config(config_file)
+
+    elif (os.path.isfile(os.path.join(sbem_cfg_dir, 'default.ini'))
+            and os.path.isfile(os.path.join(sbem_cfg_dir, 'system.cfg'))):
         # Ask user to select .ini file
         startup_dialog = ConfigDlg(VERSION)
         startup_dialog.exec_()
-        dlg_response = startup_dialog.get_ini_file()
+        config_file = startup_dialog.get_ini_file()
         device_presets_selection = startup_dialog.device_presets_selection
-        if dlg_response == 'abort':
-            configuration_loaded = False
+        if config_file == 'abort':
             print('Program aborted by user.\n')
             sys.exit()
         else:
-            try:
-                # Attempt to load the configuration files and start up the app.
-                # Logging to central log file starts at this point.
-                config_file = dlg_response
-                if config_file == 'default.ini':
-                    default_configuration = True
-                print(f'Loading configuration file {config_file} ...', end='')
-                config = ConfigParser()
-                config_file_path = os.path.join('..', 'cfg', config_file)
-                with open(config_file_path, 'r') as file:
-                    config.read_file(file)
-                print(' Done.\n')
-
-                # Load associated system configuration file
-                sysconfig_file = config['sys']['sys_config_file']
-                if default_configuration and sysconfig_file != 'system.cfg':
-                    sysconfig_file = 'system.cfg'
-                    config['sys']['sys_config_file'] = 'system.cfg'
-                print(f'Loading system settings file {sysconfig_file} ...',
-                      end='')
-                sysconfig = ConfigParser()
-                sysconfig_file_path = os.path.join('..', 'cfg', sysconfig_file)
-                with open(sysconfig_file_path, 'r') as file:
-                    sysconfig.read_file(file)
-                configuration_loaded = True
-                print(' Done.\n')
-                utils.log_info('CTRL', 
-                    f'Configuration files {config_file} and {sysconfig_file} '
-                    f'loaded.')
-            except Exception as e:
-                configuration_loaded = False
-                config_error = ('\nError while loading configuration! '
-                                'Program aborted.\n Exception: ' + str(e))
-                utils.log_error('CTRL', config_error)
-                print(config_error)
-                # Keep terminal window open when run from batch file
-                os.system('cmd /k')
-                sys.exit()
+            default_configuration, config, sysconfig = _load_config(config_file)
     else:
         # Quit if default.ini doesn't exist
-        configuration_loaded = False
         default_not_found = 'default.ini and/or system.cfg not found. Program aborted.\n'
         print(default_not_found)
         utils.log_error('CTRL', default_not_found)
-        os.system('cmd /k')
+        # os.system('cmd /k')
         sys.exit()
 
-    if configuration_loaded:
-        # Check selected .ini file and ensure there are no missing entries.
-        # Configuration must match template configuration in default.ini.
-        if default_configuration:
-            # Check if number of entries correct (no other checks at the moment)
-            success, exceptions, _, _, _, _ = process_cfg(config, sysconfig,
-                                                          is_default_cfg=True)
-        else:
-            # Check and update if necessary: obsolete entries are ignored,
-            # missing/new entries are added with default values.
-            (success, exceptions,
-             cfg_changed, syscfg_changed,
-             config, sysconfig) = (
-                process_cfg(config, sysconfig))
+    # Check selected .ini file and ensure there are no missing entries.
+    # Configuration must match template configuration in default.ini.
+    if default_configuration:
+        # Check if number of entries correct (no other checks at the moment)
+        success, exceptions, _, _, _, _ = process_cfg(config, sysconfig,
+                                                        is_default_cfg=True)
+    else:
+        # Check and update if necessary: obsolete entries are ignored,
+        # missing/new entries are added with default values.
+        (success, exceptions,
+            cfg_changed, syscfg_changed,
+            config, sysconfig) = (
+            process_cfg(config, sysconfig))
 
-            if success and device_presets_selection != [None, None]:
-                # Attempt to load presets into system configuration
-                selected_sem, selected_microtome = device_presets_selection
-                success, exc = load_device_presets(
-                    sysconfig, selected_sem, selected_microtome)
-                exceptions += '; ' + exc
-                if success:
-                    syscfg_changed = True
-                    presets_loaded = True
+        if success and device_presets_selection != [None, None]:
+            # Attempt to load presets into system configuration
+            selected_sem, selected_microtome = device_presets_selection
+            success, exc = load_device_presets(
+                sysconfig, selected_sem, selected_microtome)
+            exceptions += '; ' + exc
+            if success:
+                syscfg_changed = True
+                presets_loaded = True
 
         if success:
             if default_configuration:
@@ -267,7 +248,7 @@ def main():
                       'https://github.com/SBEMimage/SBEMimage/issues and '
                       'include all lines in /SBEMimage/log/SBEMimage.log '
                       'after the entry "ERROR : Exception".')
-                os.system('cmd /k')
+                # os.system('cmd /k')
                 sys.exit()
 
         else:
@@ -276,8 +257,61 @@ def main():
                             + 'Program aborted.\n')
             utils.log_error('CTRL', config_error)
             print(config_error)
-            os.system('cmd /k')
+            # What is this `cmd /k` for? It forces the console into another instance thereby not actually exiting..
+            # os.system('cmd /k')
             sys.exit()
+
+def _load_config(config_file: str) -> Tuple[bool, ConfigParser, ConfigParser]:
+    """
+    Parameters
+    ----------
+    config_file
+        a `.ini` file that will be loaded. Does not check for existence.
+
+    Returns
+    -------
+    default_configuration
+        whether the filename is `default.ini` or not.
+    config
+        the `.ini` ConfigParser instance.
+    sysconfig
+        the `.cfg` ConfigParser instance pointed to inside of the `.ini` file.
+    """
+    try:
+        # Attempt to load the configuration files and start up the app.
+        # Logging to central log file starts at this point.
+        default_configuration = config_file.endswith('default.ini')
+        print(f'Loading configuration file {config_file} ...', end='')
+        config = ConfigParser()
+        config_file_path = os.path.join('..', 'cfg', config_file)
+        with open(config_file_path, 'r') as file:
+            config.read_file(file)
+        print(' Done.\n')
+
+        # Load associated system configuration file
+        sysconfig_file = config['sys']['sys_config_file']
+        if default_configuration and sysconfig_file != 'system.cfg':
+            sysconfig_file = 'system.cfg'
+            config['sys']['sys_config_file'] = 'system.cfg'
+        print(f'Loading system settings file {sysconfig_file} ...',
+                end='')
+        sysconfig = ConfigParser()
+        sysconfig_file_path = os.path.join('..', 'cfg', sysconfig_file)
+        with open(sysconfig_file_path, 'r') as file:
+            sysconfig.read_file(file)
+        print(' Done.\n')
+        utils.log_info('CTRL', 
+            f'Configuration files {config_file} and {sysconfig_file} '
+            f'loaded.')
+    except Exception as e:
+        config_error = ('\nError while loading configuration! '
+                        'Program aborted.\n Exception: ' + str(e))
+        utils.log_error('CTRL', config_error)
+        print(config_error)
+        # Keep terminal window open when run from batch file
+        # os.system('cmd /k')
+        sys.exit()
+    return default_configuration, config, sysconfig
 
 
 if __name__ == '__main__':
