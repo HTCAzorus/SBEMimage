@@ -146,8 +146,8 @@ class Autofocus():
         if autofocus or autostig:
             # Switch to autofocus settings
             # TODO: allow different dwell times
-            self.sem.apply_frame_settings(0, self.pixel_size, 0.8)
-            sleep(0.5)
+            # self.sem.apply_frame_settings(0, self.pixel_size, 0.8)
+            # sleep(0.5)
             if autofocus and autostig:
                 if self.magc_mode:
                     # Run SmartSEM autofocus-autostig-autofocus sequence

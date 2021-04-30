@@ -161,8 +161,6 @@ class SEM:
         # as a function of frame resolution and pixel size (in nm):
         # M = MAG_PX_SIZE_FACTOR / (STORE_RES_X * PX_SIZE)
         self.MAG_PX_SIZE_FACTOR = int(self.syscfg['sem']['mag_px_size_factor'])
-        # For SEMs that do not support the user providing a filename
-        self.FIXED_FILENAME = self.syscfg['sem']['fixed_filename']
 
     def save_to_cfg(self):
         """Save current values of attributes to config and sysconfig objects."""

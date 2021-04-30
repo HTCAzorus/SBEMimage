@@ -92,8 +92,10 @@ class Grid:
     def __init__(self, coordinate_system, sem,
                  active=True, origin_sx_sy=(0, 0), sw_sh=(0, 0), rotation=0,
                  size=(5, 5), overlap=200, row_shift=0, active_tiles=None,
-                 frame_size=(4096, 3072), frame_size_selector=4,
-                 pixel_size=10.0, dwell_time=0.8, dwell_time_selector=4,
+                 #  frame_size=(4096, 3072), frame_size_selector=4,
+                 #  pixel_size=10.0, dwell_time=0.8, dwell_time_selector=4,
+                 frame_size=(1280, 960), frame_size_selector=1,
+                 pixel_size=10.0, dwell_time=25.6, dwell_time_selector=0,
                  display_colour=0, acq_interval=1, acq_interval_offset=0,
                  wd_stig_xy=(0, 0, 0), use_wd_gradient=False,
                  wd_gradient_ref_tiles=None,
@@ -643,9 +645,11 @@ class Grid:
     @dwell_time_selector.setter
     def dwell_time_selector(self, selector):
         self._dwell_time_selector = selector
+        # print(f'dwell_time_selector.setter to {selector}')
         # Update explict storage of dwell times
         if selector < len(self.sem.DWELL_TIME):
             self.dwell_time = self.sem.DWELL_TIME[selector]
+            # print(f'set dwell time #2 to {self.dwell_time}')
 
     def number_active_tiles(self):
         return len(self.active_tiles)
@@ -869,7 +873,11 @@ class Grid:
     def tile_cycle_time(self):
         """Calculate cycle time from SmartSEM data."""
         size_selector = self.frame_size_selector
-        scan_speed = self.sem.DWELL_TIME.index(self.dwell_time)
+        # scan_speed = self.sem.DWELL_TIME.index(self.dwell_time)
+        scan_speed = self.dwell_time_selector
+        # print(f'CYCLE_TIME: {self.sem.CYCLE_TIME}')
+        # print(f'   at size: {self.sem.CYCLE_TIME[size_selector]}')
+        # print(f'Lookup CYCLE_TIME for [{size_selector}][{scan_speed}]')
         return self.sem.CYCLE_TIME[size_selector][scan_speed] + 0.2
 
     def autofocus_ref_tiles(self):
@@ -1119,7 +1127,8 @@ class GridManager:
 
     def add_new_grid(self, origin_sx_sy=None, sw_sh=(0, 0), active=True,
                      frame_size=None, frame_size_selector=None, overlap=None,
-                     pixel_size=10.0, dwell_time=0.8, dwell_time_selector=4,
+                    #  pixel_size=10.0, dwell_time=0.8, dwell_time_selector=4,
+                     pixel_size=10.0, dwell_time=25.6, dwell_time_selector=1,
                      rotation=0, row_shift=0, acq_interval=1, acq_interval_offset=0,
                      wd_stig_xy=(0, 0, 0), use_wd_gradient=False,
                      wd_gradient_ref_tiles=None, wd_gradient_params=None,

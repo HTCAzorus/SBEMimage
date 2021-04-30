@@ -34,6 +34,7 @@ try:
         ScanSpeed, ScanState, ScanMethod)
     from hihi.su7000 import (valid_scan_shapes, valid_scan_periods, 
             valid_num_frames, valid_vacuum_targets)
+    from framestream import color_print as cp
 except ImportError:
     # If `hihi` is not present then this module can still be loaded without an 
     # exception but the classes herein cannot be instantiated.
@@ -68,7 +69,8 @@ class SEM_SU7000(SEM):
             return
 
         # Capture params have to be saved and set when the capture call is made
-        self._scan_method: ScanMethod = ScanMethod.CSS  # drift corrected
+        self._dwell_time: float = self.DWELL_TIME[0]
+        self._scan_method: ScanMethod = ScanMethod.Slow
         self._scan_shape: int = valid_scan_shapes[0]   # 640 x 480 pixels
         self._scan_period: int = valid_scan_periods[0] # 10 s / acquire
         self._num_frames: int = valid_num_frames[0]    # 8 frames / acquire for drift correction
@@ -93,7 +95,8 @@ class SEM_SU7000(SEM):
         Turn High Voltage on.
         """
         try:
-            self._su.Gun.State = HVState.On
+            # self._su.Gun.State = HVState.On
+            self._su.sync('Gun.State', HVState.On)
         except Exception as e:
             self.error_state = Error.eht
             self.error_info = str(e)
@@ -105,7 +108,7 @@ class SEM_SU7000(SEM):
         Turn High Voltage off.
         """
         try:
-            self._su.Gun.State = HVState.Off
+            self._su.sync('Gun.State', HVState.Off)
         except Exception as e:
             self.error_state = Error.eht
             self.error_info = str(e)
@@ -137,7 +140,7 @@ class SEM_SU7000(SEM):
         """
         target_eht = np.round(target_eht, decimals=1)
         try:
-            self._su.Gun.HighVoltage = target_eht
+            self._su.sync('Gun.HighVoltage', target_eht)
         except Exception as e:
             self.error_state = 306
             self.error_info = str(e)
@@ -182,7 +185,7 @@ class SEM_SU7000(SEM):
     def set_hv(self) -> bool:
         """Set Vacuum mode to `High`."""
         try:
-            self._su.Vacuum.Mode = VacuumMode.High
+            self._su.sync('Vacuum.Mode', VacuumMode.High)
         except Exception as e:
             self.error_state = Error.hp_hv
             self.error_info = str(e)
@@ -194,7 +197,8 @@ class SEM_SU7000(SEM):
         Set Variable Pressure to 'Low'.
         """
         try:
-            self._su.Vacuum.Mode = VacuumMode.Variable
+            # self._su.Vacuum.Mode = VacuumMode.Variable
+            self._su.sync('Vacuum.Mode', VacuumMode.Variable)
         except Exception as e:
             self.error_state = Error.hp_hv
             self.error_info = str(e)
@@ -208,7 +212,8 @@ class SEM_SU7000(SEM):
         log.info('TODO: will have to find closest enumerated value.')
         target_pressure = np.find_nearest(_valid_vacuum_targets, target_pressure)
         try:
-            self._su.Vacuum.Target = target_pressure
+            # self._su.Vacuum.Target = target_pressure
+            self._su.sync('Vacuum.Target', target_pressure)
         except Exception as e:
             self.error_state = Error.hp_hv
             self.error_info = str(e)
@@ -273,9 +278,11 @@ class SEM_SU7000(SEM):
         # This is a QCheckBox so I think it's for "ProbeMode" in our case
         try:
             if toggled:
-                self._su.ProbeMode = ProbeMode.High
+                self._su.sync('ProbeMode', ProbeMode.High)
+                # self._su.ProbeMode = ProbeMode.High
             else:
-                self._su.ProbeMode = ProbeMode.Normal
+                self._su.sync('ProbeMode', ProbeMode.Normal)
+                # self._su.ProbeMode = ProbeMode.Normal
         except Exception as e:
             self.error_state = Error.high_current
             self.error_info = str(e)
@@ -287,6 +294,7 @@ class SEM_SU7000(SEM):
         Read aperture size (in μm) from SU7000.
         """
         index = self._su.ObjAp.Index
+        return self.APERTURE_SIZE[index]
 
     def set_aperture_size(self, aperture_size_index: int) -> bool:
         """
@@ -295,7 +303,6 @@ class SEM_SU7000(SEM):
         """
         # Set is not supported for objective aperture.
         return False
-
 
     def apply_frame_settings(self, frame_size_selector: int, pixel_size: float, 
                              dwell_time: float) -> bool:
@@ -312,35 +319,21 @@ class SEM_SU7000(SEM):
             The pixel dwell time in μs
         """
         mag = self._su.Mag
-
-        
         ret_val1 = self.set_mag(mag)                        # Sets SEM mag
         ret_val2 = self.set_dwell_time(dwell_time)          # Sets SEM scan rate
         ret_val3 = self.set_frame_size(frame_size_selector) # Sets SEM store res
 
-        # Load SmartSEM cycle time for current settings
-        scan_speed = self.DWELL_TIME.index(dwell_time)
-        # 0.3 s and 0.8 s are safety margins
-        self.current_cycle_time = (
-            self.CYCLE_TIME[frame_size_selector][scan_speed] + 0.3)
-        if self.current_cycle_time < 0.8:
-            self.current_cycle_time = 0.8
+        # Load cycle time/scan_period for current settings
+        raise NotImplementedError('TODO: need a lookup table for dwell time -> scan_period')
+        # self.current_cycle_time = scan_times[ScanMethod.Slow, ]
         return (ret_val1 and ret_val2 and ret_val3)
 
-    def get_frame_size_selector(self):
+    def get_frame_size_selector(self) -> int:
         """
-        Read the current frame size selector from the SEM.
+        Returns the index of the current frame shape, as stored in self.STORE_RES
         """
-        raise NotImplementedError
-
-    def get_frame_size(self):
-        raise NotImplementedError
-
-    def set_frame_size(self, frame_size_selector):
-        """
-        Set SEM to frame size specified by frame_size_selector.
-        """
-        raise NotImplementedError
+        major_length = [shape[0] for shape in self.STORE_RES]
+        return major_length.index(self._scan_shape)
 
     def get_mag(self) -> int:
         """
@@ -352,7 +345,7 @@ class SEM_SU7000(SEM):
         """
         Set SEM magnification to target_mag.
         """
-        self._su.Mag = target_mag
+        self._su.sync('Mag', target_mag)
 
     def get_pixel_size(self) -> None:
         """
@@ -364,70 +357,41 @@ class SEM_SU7000(SEM):
         Depends on the scan shape being previously set.
         """
         fov = self._su.scan_field_of_view # nm
-        return fov[0] / self._scan_shape[0]
-
-        raise NotImplementedError
+        # self._scan_shape is the major (X-axis) only
+        return fov[1] / self._scan_shape
 
     def set_pixel_size(self, pixel_size: float) -> None:
         """
-        Set SEM to the magnification corresponding to pixel_size. 
+        Set SEM to the magnification corresponding to pixel_size in nanometers.
         
         Warning
         -------
         Depends on the scan shape being previously set.
         """
-        fov = self._su.scan_field_of_view
-        mag = self._su.Mag
-        current_ps = fov / self._scan_shape
-        raise NotImplementedError
+        self._su.scan_field_of_view = pixel_size * self._scan_shape
 
-    def get_scan_rate(self) -> str:
+    def get_scan_rate(self) -> int:
         """
-        Read the current scan rate from the SEM.
+        Read the index from the list of valid dwell times.
         """
-        return self._su.Scan.Speed.name
+        return self._scan_method.value
 
-    def set_scan_rate(self, scan_rate_selector: str) -> bool:
+
+    def set_scan_rate(self, scan_rate_selector: int) -> bool:
         """
         Set SEM to pixel scan rate specified by scan_rate_selector. Should be 
-        one of::
-            'Rapid1'
-            'Rapid2'
-            'Fast1'
-            'Fast2'
-            'Slow1'
-            'Slow2'
-            'Slow3'
-            'Slow4'
-            'Slow5'
-            'Slow6'
-            'Css1'
-            'Css2'
-            'Css3'
-            'Css4'
-            'Css5'
-            'Css6'
-            'Css7'
-            'ReduceH'
-            'ReduceM'
-            'ReduceS'
-            'ReduceWideH'
-            'ReduceWideS'
-            'Custom'
+        one of:
         """
         # TODO: inquire about Custom mode for low-dose usage.
-
-        try:
-            self._su.Scan.Speed = scan_rate_selector
-        except Exception as e:
-            self.error_state = Error.scan_rate
-            self.error_info = str(e)
+        self._scan_method = ScanMethod(scan_rate_selector)
         return True
 
     def set_dwell_time(self, dwell_time: float):
         """
         Convert dwell time into scan rate and call self.set_scan_rate()
         """
+        log.info(cp.m(f'Setting dwell time to {dwell_time}'))
+        # TODO: should set scan_period via some lookup table?
         # Have to set `self._su.Scan.params(method, length, acq_time, n_frames)` lazily.
         self._dwell_time = dwell_time
 
@@ -435,7 +399,7 @@ class SEM_SU7000(SEM):
         """
         Set the scan rotation angle (in degrees). Valid range is `(-200°, 200°)`.
         """
-        self._su.Scan.Rotation = angle
+        self._su.sync('Scan.Rotation', angle)
 
     def acquire_frame(self, save_path_filename: str, extra_delay: float=0.0) -> bool:
         """
@@ -462,15 +426,16 @@ class SEM_SU7000(SEM):
                                   self._scan_period,
                                   self._num_frames)
 
-        micrograph = self._su.Scan.acquire(block=True)
+        micrograph = self._su.Scan.acquire(save_path_filename)
         # SBEMImage doesn't use the returned value.
 
     def save_frame(self, save_path_filename: str) -> bool:
         """
         Save the frame currently displayed in SU7000.
         """
-        # Do we have to implement this? It saves 
-        raise NotImplementedError
+        self.error_state = Error.grab_image
+        self.error_info = 'Unsupported: Hitachi SU7000 does not support saving current frame in GUI.'
+        return False
 
     def get_wd(self) -> float:
         """
@@ -485,7 +450,7 @@ class SEM_SU7000(SEM):
         """
         target_wd *= 1000 # convert m to mm
         try:
-            self._su.WD = target_wd
+            self._su.sync('WD', target_wd)
         except Exception as e:
             self.error_state = Error.working_distance
             self.error_info = str(e)
@@ -545,24 +510,22 @@ class SEM_SU7000(SEM):
         """
         Run Hitachi autofocus, break if it takes longer than 1 min.
         """
-        log.info('TODO: test timeout on autofocus.')
-        self._su.Autofocus.start(block=True)
+        self._sy.sync('Autofocus.start')
         return True
 
     def run_autostig(self) -> bool:
         """
         Run Hitachi autostig, break if it takes longer than 1 min.
         """
-        log.info('TODO: test timeout on autostigma.')
-        self._su.Autostigma.start(block=True)
+        self._sy.sync('Autostigma.start')
         return True
 
     def run_autofocus_stig(self) -> bool:
         """
         Run combined Hitachi autofocus and autostig, break if it takes longer than 1 min.
         """
-        self._su.Autofocus.start(block=True)
-        self._su.Autostigma.start(block=True)
+        self._sy.sync('Autofocus.start')
+        self._sy.sync('Autostigma.start')
         return True
 
     def get_stage_x(self) -> float:
@@ -571,7 +534,6 @@ class SEM_SU7000(SEM):
         """
         return self._su.Stage.XY[0] * 0.001 # Convert from nm to μm
         
-
     def get_stage_y(self) -> float:
         """
         Read Y stage position (in micrometres) from SEM.
@@ -594,23 +556,25 @@ class SEM_SU7000(SEM):
         """
         Read XYZ stage position (in micrometres) from SEM, return as tuple.
         """
-        xy = self._su.Stage.XY * 0.001
-        return (*xy, self._su.Stage.Z * 0.001)
+        xyzta = self._su.Stage.XYZTA * 0.001
+        return xyzta[0:3]
         
     def move_stage_to_x(self, x: float) -> None:
         """
         Move stage to coordinate x, provided in microns.
         """
         x *= 1e3 # Convert to nm
-        # Is supposed to be _synchronous
-        self._su.sync('Stage.XY', (x, self._su.Stage.XY[1]))
+        # Is supposed to be asynchronous
+        # self._su.sync('Stage.XY', (x, self._su.Stage.XY[1]))
+        self._su.Stage.XY = x, self._su.Stage.XY[1]
 
     def move_stage_to_y(self, y: float) -> None:
         """
         Move stage to coordinate y, provided in microns.
         """
         y *= 1e3 # Convert to nm
-        # Is supposed to be _synchronous
+        # Is supposed to be asynchronous
+        # self._su.sync('Stage.XY', (self._su.Stage.XY[0], y))
         self._su.sync('Stage.XY', (self._su.Stage.XY[0], y))
 
     def move_stage_to_z(self, z: float) -> None:
@@ -618,8 +582,9 @@ class SEM_SU7000(SEM):
         Move stage to coordinate y, provided in microns.
         """
         z *= 1e3 # Convert to nm
-        # Is supposed to be _synchronous
-        self._su.sync('Stage.Z', z)
+        # Is supposed to be asynchronous
+        # self._su.sync('Stage.Z', z)
+        self._su.Stage.Z = z
 
     def move_stage_to_xy(self, coordinates: Sequence[float]) -> None:
         """
@@ -627,7 +592,8 @@ class SEM_SU7000(SEM):
         in microns.
         """
         coordinates = np.array(coordinates) * 1e3
-        self._su.sync('Stage.XY', coordinates)
+        # self._su.sync('Stage.XY', coordinates)
+        self._su.Stage.XY = coordinates
 
     # def stage_move_duration(self, from_x, from_y, to_x, to_y):
     #     """Calculate the duration of a stage move in seconds using the
