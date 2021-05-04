@@ -1095,11 +1095,12 @@ class StageCalibrationDlg(QDialog):
         shift = self.spinBox_shift.value()
         pixel_size = self.spinBox_pixelsize.value()
         dwell_time = self.sem.DWELL_TIME[self.comboBox_dwellTime.currentIndex()]
-        # Use frame size 4 if available, otherwise 3
+        # Use frame size 4 if available, otherwise 2
         if len(self.sem.STORE_RES) > 4:
             frame_size_selector = 4
         else:
-            frame_size_selector = 3
+            # Change to 2 to accommodate HHT SU7000
+            frame_size_selector = 2
 
         self.sem.apply_frame_settings(
             frame_size_selector, pixel_size, dwell_time)

@@ -121,6 +121,7 @@ class Error(Enum):
     fcc = 315
     aperture_size = 316
     high_current = 317
+    dwell_time = 318
 
     # I/O error
     primary_drive = 401
@@ -187,6 +188,7 @@ Errors = {
     Error.frame_size: 'Frame size error',
     Error.magnification: 'Magnification error',
     Error.scan_rate: 'Scan rate error',
+    Error.dwell_time: 'Dwell time error',
     Error.working_distance: 'WD error',
     Error.stig_xy: 'STIG XY error',
     Error.beam_blanking: 'Beam blanking error',

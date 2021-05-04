@@ -195,7 +195,7 @@ class StubOverview(Grid):
                          overlap=overlap, row_shift=0, active_tiles=[],
                          frame_size=[], frame_size_selector=frame_size_selector,
                         #  pixel_size=pixel_size, dwell_time=0.8,
-                        pixel_size=pixel_size, dwell_time=25.6,
+                        pixel_size=pixel_size, dwell_time=25,
                          dwell_time_selector=dwell_time_selector,
                          display_colour=11)
 
@@ -386,7 +386,7 @@ class OverviewManager:
     def add_new_overview(self, ov_active=True, centre_sx_sy=None,
                          frame_size=None, frame_size_selector=None, pixel_size=None,
                         #  dwell_time=0.8, dwell_time_selector=4,
-                        dwell_time=25.6, dwell_time_selector=0,
+                        dwell_time=25, dwell_time_selector=0,
                          acq_interval=1, acq_interval_offset=0):
         new_ov_index = self.number_ov
         if centre_sx_sy is None:

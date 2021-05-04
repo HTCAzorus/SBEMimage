@@ -25,15 +25,17 @@ import concurrent.futures as cf
 import time
 from time import perf_counter as pc
 
+
 # External site packages
 # ----------------------
+import imageio
 import numpy as np
 try:
     import hihi
     from hihi.su7000 import (HVState, VacuumMode, AlignMode, ProbeMode, 
         ScanSpeed, ScanState, ScanMethod)
-    from hihi.su7000 import (valid_scan_shapes, valid_scan_periods, 
-            valid_num_frames, valid_vacuum_targets)
+    from hihi.su7000.device import (valid_scan_shapes, valid_scan_periods, 
+            valid_num_frames, valid_vacuum_targets, find_nearest)
     from framestream import color_print as cp
 except ImportError:
     # If `hihi` is not present then this module can still be loaded without an 
@@ -46,11 +48,27 @@ except ImportError:
 from utils import Error
 from sem_control import SEM
 
+_DWELL_MAP = { # (shape, dwell): period
+    (640,   25):  10, 
+    (640,   50):  20,
+    (640,  100):  40,
+    (1280,  25):  20,
+    (1280,  50):  40,
+    (1280, 100):  80,
+    (2560,  25):  40,
+    (2560,  50):  80,
+    (2560, 100): 160,
+    (5120,  25):  80,
+    (5120,  50): 160,
+    (5120, 100): 320
+}
+
 class SEM_SU7000(SEM):
     """
     Class for remote SEM control of a Hitachi SU7000 using the HTC `hihi` 
     interface. 
     """
+
 
     def __init__(self, config: ConfigParser, sysconfig: ConfigParser):
         SEM.__init__(self, config, sysconfig)
@@ -69,10 +87,10 @@ class SEM_SU7000(SEM):
             return
 
         # Capture params have to be saved and set when the capture call is made
-        self._dwell_time: float = self.DWELL_TIME[0]
         self._scan_method: ScanMethod = ScanMethod.Slow
         self._scan_shape: int = valid_scan_shapes[0]   # 640 x 480 pixels
-        self._scan_period: int = valid_scan_periods[0] # 10 s / acquire
+        # self._scan_period: int = valid_scan_periods[0] # 10 s / acquire
+        self._dwell_time: float = self.DWELL_TIME[0]
         self._num_frames: int = valid_num_frames[0]    # 8 frames / acquire for drift correction
 
     def load_system_constants(self) -> None:
@@ -210,7 +228,7 @@ class SEM_SU7000(SEM):
         Set the variable pressure target pressure.
         """
         log.info('TODO: will have to find closest enumerated value.')
-        target_pressure = np.find_nearest(_valid_vacuum_targets, target_pressure)
+        target_pressure = find_nearest(target_pressure, valid_vacuum_targets)
         try:
             # self._su.Vacuum.Target = target_pressure
             self._su.sync('Vacuum.Target', target_pressure)
@@ -318,14 +336,16 @@ class SEM_SU7000(SEM):
         dwell_time:
             The pixel dwell time in μs
         """
-        mag = self._su.Mag
-        ret_val1 = self.set_mag(mag)                        # Sets SEM mag
+        ret_val1 = self.set_pixel_size(pixel_size)
         ret_val2 = self.set_dwell_time(dwell_time)          # Sets SEM scan rate
         ret_val3 = self.set_frame_size(frame_size_selector) # Sets SEM store res
 
         # Load cycle time/scan_period for current settings
-        raise NotImplementedError('TODO: need a lookup table for dwell time -> scan_period')
-        # self.current_cycle_time = scan_times[ScanMethod.Slow, ]
+        #     TODO: allow faster scans via Fast? 
+        # self._scan_method = ScanMethod.Slow
+        scan_speed = self.DWELL_TIME.index(dwell_time)
+        self.current_cycle_time = self.CYCLE_TIME[frame_size_selector][scan_speed]
+
         return (ret_val1 and ret_val2 and ret_val3)
 
     def get_frame_size_selector(self) -> int:
@@ -334,6 +354,20 @@ class SEM_SU7000(SEM):
         """
         major_length = [shape[0] for shape in self.STORE_RES]
         return major_length.index(self._scan_shape)
+
+    # NOT USED:
+    # def get_frame_size(self):
+    #     return self._scan_shape
+
+    def set_frame_size(self, frame_size_selector: int) -> bool:
+        """Set SEM to frame size specified by frame_size_selector."""
+        try:
+            self._scan_shape = valid_scan_shapes[frame_size_selector]
+        except IndexError:
+            self.error_state = Error.frame_size
+            self.error_info = f'{frame_size_selector} is not a valid shape index.'
+            return False
+        return True
 
     def get_mag(self) -> int:
         """
@@ -379,21 +413,26 @@ class SEM_SU7000(SEM):
 
     def set_scan_rate(self, scan_rate_selector: int) -> bool:
         """
-        Set SEM to pixel scan rate specified by scan_rate_selector. Should be 
-        one of:
+        Set SEM to pixel scan rate specified by scan_rate_selector integer index.
         """
-        # TODO: inquire about Custom mode for low-dose usage.
+        # TODO: inquire with HHT about Custom mode for low-dose usage.
         self._scan_method = ScanMethod(scan_rate_selector)
         return True
 
-    def set_dwell_time(self, dwell_time: float):
+    def set_dwell_time(self, dwell_time: float) -> bool:
         """
         Convert dwell time into scan rate and call self.set_scan_rate()
         """
-        log.info(cp.m(f'Setting dwell time to {dwell_time}'))
+        # log.info(cp.m(f'Setting dwell time to {dwell_time}'))
         # TODO: should set scan_period via some lookup table?
         # Have to set `self._su.Scan.params(method, length, acq_time, n_frames)` lazily.
+        dwell_time = find_nearest(dwell_time, self.DWELL_TIME)
+        if not (self._scan_shape, self._dwell_time) in _DWELL_MAP:
+            self.error_state = Error.dwell_time
+            self.error_info = f'{dwell_time} is not a valid dwell time for scan shape {self._scan_shape}'
+            return False
         self._dwell_time = dwell_time
+        return True
 
     def set_scan_rotation(self, angle: float) -> None:
         """
@@ -409,25 +448,42 @@ class SEM_SU7000(SEM):
         Parameters
         ----------
         save_path_filename
-            The Hitachi SU7000 files are always saved to a fixed file path, 
-
-                D:\\SemImage\\temp\\C_Image_01.bmp
-
-            so a future is launched that watches the file and makes a copy.
-
+            The absolute path to which the file will be saved. Note that SU7000
+            always saves to '.bmp' so extensions such as '.tif' will be removed.
         extra_delay
             Not used.
         """
-    
-        # Based on usage in `acquisition.py` this method appears to be blocking.
-        # Parameters are held lazily until acquire as there are no getters
-        self._su._scan.parameters(self._scan_method,
-                                  self._scan_shape,
-                                  self._scan_period,
-                                  self._num_frames)
+        # Is save_path_filename already escaped?
+        print(cp.lr(f'SAVE TO PATH: {save_path_filename}'))
+        # save_path_filename = save_path_filename.replace('\\', '/')
 
-        micrograph = self._su.Scan.acquire(save_path_filename)
+        # Based on usage in `acquisition.py` this method appears to be blocking.
+        # Parameters are held lazily until acquire as there are no getters 
+        # in SU7000 external control API.
+        scan_period = _DWELL_MAP[self._scan_shape, self._dwell_time]
+        try:
+            self._su.Scan.params(self._scan_method,
+                                self._scan_shape,
+                                scan_period,
+                                self._num_frames)
+        except (ValueError, SyntaxError) as e:
+            self.error_state = Error.grab_image
+            self.error_info = f'Failed to set scan parameters to {self._scan_method, self._scan_shape, self._scan_period, self._num_frames} due to {e}'
+            return False
+        time.sleep(0.2)
+        try:
+            micrograph = self._su.Scan.acquire(save_path_filename)
+        except SyntaxError as e:
+            self.error_state = Error.grab_image
+            self.error_info = f'Failed to capture scan to path: {save_path_filename}'
+            return False
         # SBEMImage doesn't use the returned value.
+        # However, SBEMImage expects all filenames to be .TIF extension, so 
+        # we load up the BMP and save as a TIFF.
+        # (We could save micrograph directly too if it's not float32)
+        bmp_filename = path.splitext(save_path_filename)[0] + '.bmp'
+        imageio.imwrite(save_path_filename, imageio.imread(bmp_filename))
+        return True
 
     def save_frame(self, save_path_filename: str) -> bool:
         """
