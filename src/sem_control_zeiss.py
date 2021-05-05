@@ -428,7 +428,7 @@ class SEM_SmartSEM(SEM):
 
     def set_dwell_time(self, dwell_time):
         """Convert dwell time into scan rate and call self.set_scan_rate()."""
-        return self.set_scan_rate(self.DWELL_TIME.index(dwell_time))
+        return self.set_scan_rate(self._dwell_index)
 
     def set_scan_rotation(self, angle):
         """Set the scan rotation angle (in degrees). Enable scan rotation

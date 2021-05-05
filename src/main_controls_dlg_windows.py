@@ -983,7 +983,8 @@ class StageCalibrationDlg(QDialog):
         self.doubleSpinBox_motorSpeedX.setValue(self.stage.motor_speed_x)
         self.doubleSpinBox_motorSpeedY.setValue(self.stage.motor_speed_y)
         self.comboBox_dwellTime.addItems(map(str, self.sem.DWELL_TIME))
-        self.comboBox_dwellTime.setCurrentIndex(4)
+        dwell_index = self.sem.DWELL_TIME.index(self.sem.grab_dwell_time)
+        self.comboBox_dwellTime.setCurrentIndex(dwell_index)
         # TODO: use a list instead:
         self.comboBox_package.addItems(['cv2', 'imreg_dft', 'skimage'])
         self.pushButton_startImageAcq.clicked.connect(
@@ -1106,10 +1107,15 @@ class StageCalibrationDlg(QDialog):
             frame_size_selector, pixel_size, dwell_time)
 
         start_x, start_y = self.stage.get_xy()
+        print(f'STARTING POSITION: {start_x, start_y}')
         # Acquire first image at starting position
         self.sem.acquire_frame(self.base_dir + '\\start.tif')
         # Shift along X stage
+        print(f'APPLYING SHIFT OF {shift} to X')
         self.stage.move_to_xy((start_x + shift, start_y))
+        # WARNING: there is no wait here. So perhaps we should be calling Sync on
+        # movement?
+        # 
         # Second image, at new X position (Y unchanged from starting position)
         self.sem.acquire_frame(self.base_dir + '\\shift_x.tif')
         # Shift along Y direction, X back to starting position

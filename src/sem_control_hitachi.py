@@ -419,6 +419,10 @@ class SEM_SU7000(SEM):
         self._scan_method = ScanMethod(scan_rate_selector)
         return True
 
+    def get_dwell_time(self) -> float:
+        """Return dwell time in microseconds."""
+        return self._dwell_time
+
     def set_dwell_time(self, dwell_time: float) -> bool:
         """
         Convert dwell time into scan rate and call self.set_scan_rate()
@@ -606,41 +610,49 @@ class SEM_SU7000(SEM):
         """
         Read XY stage position (in micrometres) from SEM, return as tuple.
         """
-        return tuple(self._su.Stage.XY * 0.001)
+        xy = self._su.Stage.XY
+        print(cp.g(f'Got XY = {xy} nm'))
+        xy *= 0.001  # convert from nm to to μm
+        return tuple(xy)
 
     def get_stage_xyz(self):
         """
         Read XYZ stage position (in micrometres) from SEM, return as tuple.
         """
-        xyzta = self._su.Stage.XYZTA * 0.001
-        return xyzta[0:3]
+        xyz = self._su.Stage.XYZTA[0:3]
+        print(cp.g(f'Got XYZ = {xyz} nm'))
+        xyz *=  0.001 # convert from nm to to μm
+        return tuple(xyz)
+
         
     def move_stage_to_x(self, x: float) -> None:
         """
         Move stage to coordinate x, provided in microns.
         """
         x *= 1e3 # Convert to nm
-        # Is supposed to be asynchronous
-        # self._su.sync('Stage.XY', (x, self._su.Stage.XY[1]))
-        self._su.Stage.XY = x, self._su.Stage.XY[1]
+        print(cp.b(f'Move stage-X to {x} nm'))
+        # Is supposed to be asynchronous?
+        self._su.sync('Stage.XY', (x, self._su.Stage.XY[1]))
+        # self._su.Stage.XY = x, self._su.Stage.XY[1]
 
     def move_stage_to_y(self, y: float) -> None:
         """
         Move stage to coordinate y, provided in microns.
         """
         y *= 1e3 # Convert to nm
-        # Is supposed to be asynchronous
-        # self._su.sync('Stage.XY', (self._su.Stage.XY[0], y))
+        # Is supposed to be asynchronous?
+        print(cp.b(f'Move stage-X to {y} nm'))
         self._su.sync('Stage.XY', (self._su.Stage.XY[0], y))
+        # self._su.sync('Stage.XY', (self._su.Stage.XY[0], y))
 
     def move_stage_to_z(self, z: float) -> None:
         """
         Move stage to coordinate y, provided in microns.
         """
         z *= 1e3 # Convert to nm
-        # Is supposed to be asynchronous
-        # self._su.sync('Stage.Z', z)
-        self._su.Stage.Z = z
+        # Is supposed to be asynchronous?
+        self._su.sync('Stage.Z', z)
+        # self._su.Stage.Z = z
 
     def move_stage_to_xy(self, coordinates: Sequence[float]) -> None:
         """
@@ -648,8 +660,9 @@ class SEM_SU7000(SEM):
         in microns.
         """
         coordinates = np.array(coordinates) * 1e3
-        # self._su.sync('Stage.XY', coordinates)
-        self._su.Stage.XY = coordinates
+        print(cp.b(f'Move stage to {coordinates} nm'))
+        self._su.sync('Stage.XY', coordinates)
+        # self._su.Stage.XY = coordinates
 
     # def stage_move_duration(self, from_x, from_y, to_x, to_y):
     #     """Calculate the duration of a stage move in seconds using the
