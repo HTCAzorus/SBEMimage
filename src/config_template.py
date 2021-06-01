@@ -23,11 +23,11 @@ from configparser import ConfigParser
 # deleted from the default configuration files
 CFG_TEMPLATE_FILE = '..\\cfg\\default.ini'  # Template of user configuration
 CFG_NUMBER_SECTIONS = 12
-CFG_NUMBER_KEYS = 213
+CFG_NUMBER_KEYS = 214
 
 SYSCFG_TEMPLATE_FILE = '..\\cfg\\system.cfg'  # Template of system configuration
 SYSCFG_NUMBER_SECTIONS = 8
-SYSCFG_NUMBER_KEYS = 50
+SYSCFG_NUMBER_KEYS = 54
 
 # Presets file: contains presets for different devices
 DEVICE_PRESETS_FILE = '..\\cfg\\device_presets.cfg'
@@ -201,6 +201,20 @@ def load_device_presets(syscfg, selected_sem, selected_microtome):
     except Exception as e:
         return False, str(e)
 
+    # Note: Load microtome presets first because in case of a Sigma-3View
+    # combination, different values for the 3View stage calibration are 
+    # loaded from the SEM presets. 
+
+    if selected_microtome:
+        # Load microtome presets and write them into system configuration
+        try:
+            microtome_presets = device_presets[selected_microtome]
+            for key in microtome_presets:
+                syscfg_section, syscfg_key = key.split('_', 1)
+                syscfg[syscfg_section][syscfg_key] = microtome_presets[key]
+        except Exception as e:
+            return False, str(e)
+
     if selected_sem:
         # Load SEM presets and write them into system configuration
         try:
@@ -211,15 +225,4 @@ def load_device_presets(syscfg, selected_sem, selected_microtome):
         except Exception as e:
             return False, str(e)
 
-    if selected_microtome:
-        # Load microtome presets and write them into system configuration
-        try:
-            microtome_presets = device_presets[selected_microtome]
-            for key in microtome_presets:
-                syscfg_section, syscfg_key = key.split('_', 1)
-                syscfg[syscfg_section][syscfg_key] = microtome_presets[key]
-        except Exception as e:
-            return False, str(e)    
-
     return True, ''
-

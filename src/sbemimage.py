@@ -156,6 +156,9 @@ def main():
         # os.system('cmd /k')
         sys.exit()
 
+    # Here we have my original changes, below is BT's changes
+    # TODO: This code block can be removed in the future.
+    '''
     # Check selected .ini file and ensure there are no missing entries.
     # Configuration must match template configuration in default.ini.
     if default_configuration:
@@ -179,6 +182,34 @@ def main():
             if success:
                 syscfg_changed = True
                 presets_loaded = True
+    '''
+
+    if configuration_loaded:
+        # Check selected .ini file and ensure there are no missing entries.
+        # Configuration must match template configuration in default.ini.
+        if default_configuration:
+            # Check if number of entries correct (no other checks at the moment)
+            success, exceptions, _, _, _, _ = process_cfg(config, sysconfig,
+                                                          is_default_cfg=True)
+
+            if success and device_presets_selection != [None, None]:
+                # Attempt to load presets into system configuration
+                selected_sem, selected_microtome = device_presets_selection
+                success, exc = load_device_presets(
+                    sysconfig, selected_sem, selected_microtome)
+                exceptions += '; ' + exc
+                if success:
+                    if device_presets_selection[1] == None:
+                        config['sys']['use_microtome'] = 'False'
+                    syscfg_changed = True
+                    presets_loaded = True
+        else:
+            # Check and update if necessary: obsolete entries are ignored,
+            # missing/new entries are added with default values.
+            (success, exceptions,
+             cfg_changed, syscfg_changed,
+             config, sysconfig) = (
+                process_cfg(config, sysconfig))
 
         if success:
             if default_configuration:
