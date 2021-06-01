@@ -91,17 +91,9 @@ class Grid:
 
     def __init__(self, coordinate_system, sem,
                  active=True, origin_sx_sy=(0, 0), sw_sh=(0, 0), rotation=0,
-<<<<<<< HEAD
-                 size=(5, 5), overlap=200, row_shift=0, active_tiles=None,
-                 #  frame_size=(4096, 3072), frame_size_selector=4,
-                 #  pixel_size=10.0, dwell_time=0.8, dwell_time_selector=4,
-                 frame_size=(1280, 960), frame_size_selector=1,
-                 pixel_size=10.0, dwell_time=25, dwell_time_selector=0,
-=======
                  size=(5, 5), overlap=None, row_shift=0, active_tiles=None,
                  frame_size=None, frame_size_selector=None,
                  pixel_size=10.0, dwell_time=None, dwell_time_selector=None,
->>>>>>> 5aecb27679c2f15850ed97ee81ab1fa0c665d885
                  display_colour=0, acq_interval=1, acq_interval_offset=0,
                  wd_stig_xy=(0, 0, 0), use_wd_gradient=False,
                  wd_gradient_ref_tiles=None,

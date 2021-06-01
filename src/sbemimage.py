@@ -116,6 +116,7 @@ def main():
           f'     {version_info}\n'
           f'{line_of_stars}\n')
 
+    configuration_loaded = False
     default_configuration = False
     presets_loaded = False
     device_presets_selection = [None, None]
@@ -135,6 +136,7 @@ def main():
         else:
             raise ValueError(f'File {options.ini} not found in working directory or SBEM_CONFIG_DIR environment variable directory.')
         default_configuration, config, sysconfig = _load_config(config_file)
+        configuration_loaded = True
 
     elif (os.path.isfile(os.path.join(sbem_cfg_dir, 'default.ini'))
             and os.path.isfile(os.path.join(sbem_cfg_dir, 'system.cfg'))):
@@ -148,6 +150,7 @@ def main():
             sys.exit()
         else:
             default_configuration, config, sysconfig = _load_config(config_file)
+            configuration_loaded = True
     else:
         # Quit if default.ini doesn't exist
         default_not_found = 'default.ini and/or system.cfg not found. Program aborted.\n'
@@ -155,34 +158,6 @@ def main():
         utils.log_error('CTRL', default_not_found)
         # os.system('cmd /k')
         sys.exit()
-
-    # Here we have my original changes, below is BT's changes
-    # TODO: This code block can be removed in the future.
-    '''
-    # Check selected .ini file and ensure there are no missing entries.
-    # Configuration must match template configuration in default.ini.
-    if default_configuration:
-        # Check if number of entries correct (no other checks at the moment)
-        success, exceptions, _, _, _, _ = process_cfg(config, sysconfig,
-                                                        is_default_cfg=True)
-    else:
-        # Check and update if necessary: obsolete entries are ignored,
-        # missing/new entries are added with default values.
-        (success, exceptions,
-            cfg_changed, syscfg_changed,
-            config, sysconfig) = (
-            process_cfg(config, sysconfig))
-
-        if success and device_presets_selection != [None, None]:
-            # Attempt to load presets into system configuration
-            selected_sem, selected_microtome = device_presets_selection
-            success, exc = load_device_presets(
-                sysconfig, selected_sem, selected_microtome)
-            exceptions += '; ' + exc
-            if success:
-                syscfg_changed = True
-                presets_loaded = True
-    '''
 
     if configuration_loaded:
         # Check selected .ini file and ensure there are no missing entries.
