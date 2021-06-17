@@ -17,5 +17,5 @@ psutil
 opencv-python
 comtypes
 shapely
-tqdm
 qdarkstyle
+tqdm
