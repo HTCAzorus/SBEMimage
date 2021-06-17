@@ -661,12 +661,13 @@ class Grid:
 
     @dwell_time_selector.setter
     def dwell_time_selector(self, selector):
+        if selector >= len(self.sem.DWELL_TIME):
+            print("Dwell size selector is too long; cropping.")
+            selector = len(self.sem.DWELL_TIME) - 1
         self._dwell_time_selector = selector
         # print(f'dwell_time_selector.setter to {selector}')
-        # Update explict storage of dwell times
-        if selector < len(self.sem.DWELL_TIME):
-            self.dwell_time = self.sem.DWELL_TIME[selector]
-            # print(f'set dwell time #2 to {self.dwell_time}')
+        # Update explicit storage of dwell time.
+        self.dwell_time = self.sem.DWELL_TIME[selector]
 
     def number_active_tiles(self):
         return len(self.active_tiles)

@@ -86,6 +86,7 @@ class SEM_SU7000(SEM):
             self.error_info = str(e)
             return
 
+        self._su._debug_mode = True
         # Capture params have to be saved and set when the capture call is made
         self._scan_method: ScanMethod = ScanMethod.Slow
         self._scan_shape: int = valid_scan_shapes[0]   # 640 x 480 pixels
@@ -633,7 +634,6 @@ class SEM_SU7000(SEM):
         print(cp.b(f'Move stage-X to {x} nm'))
         # Is supposed to be asynchronous?
         self._su.sync('Stage.XY', (x, self._su.Stage.XY[1]))
-        # self._su.Stage.XY = x, self._su.Stage.XY[1]
 
     def move_stage_to_y(self, y: float) -> None:
         """
@@ -643,7 +643,6 @@ class SEM_SU7000(SEM):
         # Is supposed to be asynchronous?
         print(cp.b(f'Move stage-X to {y} nm'))
         self._su.sync('Stage.XY', (self._su.Stage.XY[0], y))
-        # self._su.sync('Stage.XY', (self._su.Stage.XY[0], y))
 
     def move_stage_to_z(self, z: float) -> None:
         """
@@ -652,7 +651,6 @@ class SEM_SU7000(SEM):
         z *= 1e3 # Convert to nm
         # Is supposed to be asynchronous?
         self._su.sync('Stage.Z', z)
-        # self._su.Stage.Z = z
 
     def move_stage_to_xy(self, coordinates: Sequence[float]) -> None:
         """
@@ -662,7 +660,6 @@ class SEM_SU7000(SEM):
         coordinates = np.array(coordinates) * 1e3
         print(cp.b(f'Move stage to {coordinates} nm'))
         self._su.sync('Stage.XY', coordinates)
-        # self._su.Stage.XY = coordinates
 
     # def stage_move_duration(self, from_x, from_y, to_x, to_y):
     #     """Calculate the duration of a stage move in seconds using the
