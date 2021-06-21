@@ -191,6 +191,7 @@ def load_device_presets(syscfg, selected_sem, selected_microtome):
     DEVICE_PRESETS_FILE into the system configuration (syscfg).
     Return (True, '') if successful, otherwise (False, exception_str). 
     """
+    print(f'Load presets for SEM: {selected_sem} and microtome: {selected_microtome}')
     if selected_sem is None and selected_microtome is None:
         return False, ''
 
@@ -213,6 +214,7 @@ def load_device_presets(syscfg, selected_sem, selected_microtome):
                 syscfg_section, syscfg_key = key.split('_', 1)
                 syscfg[syscfg_section][syscfg_key] = microtome_presets[key]
         except Exception as e:
+            print(f'Exception in loading microtome {selected_microtome}: {str(e)}')
             return False, str(e)
 
     if selected_sem:
@@ -223,6 +225,7 @@ def load_device_presets(syscfg, selected_sem, selected_microtome):
                 syscfg_section, syscfg_key = key.split('_', 1)
                 syscfg[syscfg_section][syscfg_key] = sem_presets[key]
         except Exception as e:
+            print(f'Exception in loading SEM {selected_sem}: {str(e)}')
             return False, str(e)
 
     return True, ''

@@ -73,6 +73,7 @@ class SEM_SU7000(SEM):
     def __init__(self, config: ConfigParser, sysconfig: ConfigParser):
         SEM.__init__(self, config, sysconfig)
 
+        # WARNING: calls to `log` do not work until `hihi.HTCClient` is constructed
         if hihi is None:
             raise ImportError(f'Cannot instantiate `SEM_SU7000` as `hihi` package not found.')
 
@@ -85,6 +86,13 @@ class SEM_SU7000(SEM):
             self.error_state = Error.hihi_connect
             self.error_info = str(e)
             return
+        
+        log.info(cp.y('Loading syscfg'))
+        log.info(cp.y('=============='))
+        log.info(cp.y({section: dict(sysconfig[section]) for section in sysconfig.sections()}))
+        log.info(cp.lr('\n\nLoading config'))
+        log.info(cp.lr('============='))
+        log.info(cp.lr({section: dict(config[section]) for section in config.sections()}))
 
         self._su._debug_mode = True
         # Capture params have to be saved and set when the capture call is made
@@ -101,6 +109,8 @@ class SEM_SU7000(SEM):
         SEM.load_system_constants(self)
         # TODO: load any custom Hitachi attributes
         log.info(f'STORE_RES: loaded as {self.STORE_RES}')
+        log.info(f'')
+        log.info(f'DWELL_TIME: loaded as {self.DWELL_TIME}')
 
     def save_to_cfg(self) -> None:
         """
@@ -428,7 +438,7 @@ class SEM_SU7000(SEM):
         """
         Convert dwell time into scan rate and call self.set_scan_rate()
         """
-        # log.info(cp.m(f'Setting dwell time to {dwell_time}'))
+        log.info(cp.m(f'Setting dwell time to {dwell_time} mapping into list {self.DWELL_TIME}'))
         # TODO: should set scan_period via some lookup table?
         # Have to set `self._su.Scan.params(method, length, acq_time, n_frames)` lazily.
         dwell_time = find_nearest(dwell_time, self.DWELL_TIME)
@@ -620,7 +630,7 @@ class SEM_SU7000(SEM):
         """
         Read XYZ stage position (in micrometres) from SEM, return as tuple.
         """
-        xyz = self._su.Stage.XYZTA[0:3]
+        xyz = self._su.Stage.XYZTR[0:3]
         print(cp.g(f'Got XYZ = {xyz} nm'))
         xyz *=  0.001 # convert from nm to to μm
         return tuple(xyz)

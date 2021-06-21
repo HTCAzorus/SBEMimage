@@ -101,7 +101,7 @@ def main():
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
 
     colorama.init()
-    os.system('cls')
+    # os.system('cls')
     if 'dev' in VERSION.lower():
         title_str = 'SBEMimage - Console - DEVELOPMENT VERSION'
         version_info = f'DEVELOPMENT VERSION ({VERSION})'
