@@ -87,13 +87,16 @@ class SEM_SU7000(SEM):
             self.error_info = str(e)
             return
         
-        log.info(cp.y('Loading syscfg'))
-        log.info(cp.y('=============='))
-        log.info(cp.y({section: dict(sysconfig[section]) for section in sysconfig.sections()}))
-        log.info(cp.lr('\n\nLoading config'))
-        log.info(cp.lr('============='))
-        log.info(cp.lr({section: dict(config[section]) for section in config.sections()}))
+        # log.info(cp.y('Loading syscfg'))
+        # log.info(cp.y('=============='))
+        # log.info(cp.y({section: dict(sysconfig[section]) for section in sysconfig.sections()}))
+        # log.info(cp.lr('\n\nLoading config'))
+        # log.info(cp.lr('============='))
+        # log.info(cp.lr({section: dict(config[section]) for section in config.sections()}))
 
+        # Try to force the scan to be running as when frozen it breaks most of 
+        # the extcon functionality.
+        self._su.sync('Scan.State', ScanState.Run)
         self._su._debug_mode = True
         # Capture params have to be saved and set when the capture call is made
         self._scan_method: ScanMethod = ScanMethod.Slow
@@ -108,9 +111,9 @@ class SEM_SU7000(SEM):
         """
         SEM.load_system_constants(self)
         # TODO: load any custom Hitachi attributes
-        log.info(f'STORE_RES: loaded as {self.STORE_RES}')
-        log.info(f'')
-        log.info(f'DWELL_TIME: loaded as {self.DWELL_TIME}')
+        # log.info(f'STORE_RES: loaded as {self.STORE_RES}')
+        # log.info(f'')
+        # log.info(f'DWELL_TIME: loaded as {self.DWELL_TIME}')
 
     def save_to_cfg(self) -> None:
         """
@@ -238,7 +241,7 @@ class SEM_SU7000(SEM):
         """
         Set the variable pressure target pressure.
         """
-        log.info('TODO: will have to find closest enumerated value.')
+        # log.info('TODO: will have to find closest enumerated value.')
         target_pressure = find_nearest(target_pressure, valid_vacuum_targets)
         try:
             # self._su.Vacuum.Target = target_pressure
@@ -468,16 +471,12 @@ class SEM_SU7000(SEM):
         extra_delay
             Not used.
         """
-        # Is save_path_filename already escaped?
-        print(cp.lr(f'SAVE TO PATH: {save_path_filename}'))
-        # save_path_filename = save_path_filename.replace('\\', '/')
-
         # Based on usage in `acquisition.py` this method appears to be blocking.
         # Parameters are held lazily until acquire as there are no getters 
         # in SU7000 external control API.
         scan_period = _DWELL_MAP[self._scan_shape, self._dwell_time]
         try:
-            self._su.Scan.params(self._scan_method,
+            self._su.sync('Scan.params', self._scan_method,
                                 self._scan_shape,
                                 scan_period,
                                 self._num_frames)
@@ -485,13 +484,13 @@ class SEM_SU7000(SEM):
             self.error_state = Error.grab_image
             self.error_info = f'Failed to set scan parameters to {self._scan_method, self._scan_shape, self._scan_period, self._num_frames} due to {e}'
             return False
-        time.sleep(0.2)
         try:
-            micrograph = self._su.Scan.acquire(save_path_filename)
+            micrograph = self._su.sync('Scan.acquire', save_path_filename)
         except SyntaxError as e:
             self.error_state = Error.grab_image
             self.error_info = f'Failed to capture scan to path: {save_path_filename}'
             return False
+        # self._su.Scan.State
         # SBEMImage doesn't use the returned value.
         # However, SBEMImage expects all filenames to be .TIF extension, so 
         # we load up the BMP and save as a TIFF.
@@ -622,7 +621,7 @@ class SEM_SU7000(SEM):
         Read XY stage position (in micrometres) from SEM, return as tuple.
         """
         xy = self._su.Stage.XY
-        print(cp.g(f'Got XY = {xy} nm'))
+        # print(cp.g(f'Got XY = {xy} nm'))
         xy *= 0.001  # convert from nm to to μm
         return tuple(xy)
 
@@ -631,7 +630,7 @@ class SEM_SU7000(SEM):
         Read XYZ stage position (in micrometres) from SEM, return as tuple.
         """
         xyz = self._su.Stage.XYZTR[0:3]
-        print(cp.g(f'Got XYZ = {xyz} nm'))
+        # print(cp.g(f'Got XYZ = {xyz} nm'))
         xyz *=  0.001 # convert from nm to to μm
         return tuple(xyz)
 
@@ -641,7 +640,7 @@ class SEM_SU7000(SEM):
         Move stage to coordinate x, provided in microns.
         """
         x *= 1e3 # Convert to nm
-        print(cp.b(f'Move stage-X to {x} nm'))
+        # print(cp.b(f'Move stage-X to {x} nm'))
         # Is supposed to be asynchronous?
         self._su.sync('Stage.XY', (x, self._su.Stage.XY[1]))
 
@@ -651,7 +650,7 @@ class SEM_SU7000(SEM):
         """
         y *= 1e3 # Convert to nm
         # Is supposed to be asynchronous?
-        print(cp.b(f'Move stage-X to {y} nm'))
+        # print(cp.b(f'Move stage-X to {y} nm'))
         self._su.sync('Stage.XY', (self._su.Stage.XY[0], y))
 
     def move_stage_to_z(self, z: float) -> None:
@@ -668,7 +667,7 @@ class SEM_SU7000(SEM):
         in microns.
         """
         coordinates = np.array(coordinates) * 1e3
-        print(cp.b(f'Move stage to {coordinates} nm'))
+        # print(cp.b(f'Move stage to {coordinates} nm'))
         self._su.sync('Stage.XY', coordinates)
 
     # def stage_move_duration(self, from_x, from_y, to_x, to_y):
