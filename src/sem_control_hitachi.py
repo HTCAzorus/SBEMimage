@@ -96,7 +96,10 @@ class SEM_SU7000(SEM):
 
         # Try to force the scan to be running as when frozen it breaks most of 
         # the extcon functionality.
-        self._su.sync('Scan.State', ScanState.Run)
+        try:
+            self._su.sync('Scan.State', ScanState.Run)
+        except SyntaxError: # SEM HV is likely off.
+            log.warning(cp.y('Could not set Scan state, is HV on?'))
         self._su._debug_mode = True
         # Capture params have to be saved and set when the capture call is made
         self._scan_method: ScanMethod = ScanMethod.Slow
