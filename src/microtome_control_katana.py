@@ -258,7 +258,7 @@ class Microtome_katana(Microtome):
         return delay    
 
     def do_full_approach_cut(self):
-         """Perform a full cut cycle."""
+        """Perform a full cut cycle."""
         # Move to cutting window
         # (good practice to check the knife is not moving before starting)
         self._wait_until_knife_stopped()
