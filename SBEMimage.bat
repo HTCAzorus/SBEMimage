@@ -1,5 +1,6 @@
 @echo off
 rem The current directory (where this batch file is located) must be the SBEMimage installation directory.
+call activate azorus_dev
 cd src
 IF EXIST ..\Python\ (
 	rem Run python installed by NSIS installer.
@@ -8,7 +9,7 @@ IF EXIST ..\Python\ (
 	rem Run system python (path must be in %PATH% environment variable).
 	python SBEMimage.py
 )
-cd..
+cd ..
 rem Check if status.dat exists in cfg directory (this means that the program terminated normally.)
 cd cfg
 IF EXIST status.dat (

@@ -258,8 +258,44 @@ class Microtome_katana(Microtome):
         return delay    
 
     def do_full_approach_cut(self):
-        """Perform a full cut cycle under the assumption that knife is
-           already neared."""
+         """Perform a full cut cycle."""
+        # Move to cutting window
+        # (good practice to check the knife is not moving before starting)
+        self._wait_until_knife_stopped()
+        print('Moving to cutting position '
+              + str(self.cut_window_start) + ' ...')
+        self._send_command('KMS' + str(self.knife_fast_speed))
+        # send required speed. The reason I'm setting it every time before
+        # moving is that I'm using two different speeds
+        # (knifeFastSpeed & knifeCutSpeed)
+        self._send_command('KKM' + str(self.cut_window_start))   # send required position
+
+        # Turn oscillator on
+        self._wait_until_knife_stopped()
+        if self.is_oscillation_enabled():
+            # turn oscillator on
+            self._send_command('KO' + str(self.oscillation_frequency))
+            self._send_command('KOA' + str(self.oscillation_amplitude))
+
+        # Cut sample
+        print('Cutting sample...')
+        self._send_command('KMS' + str(self.knife_cut_speed))
+        self._send_command('KKM' + str(self.cut_window_end))
+
+        # Turn oscillator off
+        self._wait_until_knife_stopped()
+        if self.is_oscillation_enabled():
+            self._send_command('KOA0')
+
+        # Retract knife
+        print('Retracting knife...')
+        self._send_command('KMS' + str(self.knife_fast_speed))
+        self._send_command('KKM' + str(self.cut_window_star))
+
+        # Raise sample to cutting plane
+        self._wait_until_knife_stopped()
+        print('Returning sample to cutting plane...')
+        self.move_stage_to_z(desiredzPos, 100)
         pass
 
     def do_sweep(self, z_position):
