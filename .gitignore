@@ -15,6 +15,7 @@ __pycache__/
 !device_presets.cfg
 !installer.cfg
 !su7000.ini
+!su7000.cfg
 
 # DM script control files
 DMcom.*
