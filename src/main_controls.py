@@ -1890,11 +1890,12 @@ class MainControls(QMainWindow):
                 'focus/stigmation parameters. Target settings have been '
                 'restored.', QMessageBox.Ok)
         elif msg == 'MAG ALERT':
-            QMessageBox.warning(
-                self, 'Magnification change detected',
-                'SBEMimage has detected an unexpected change in '
-                'magnification. Target setting has been restored.',
-                QMessageBox.Ok)
+            pass
+            #QMessageBox.warning(
+            #    self, 'Magnification change detected',
+            #    'SBEMimage has detected an unexpected change in '
+            #    'magnification. Target setting has been restored.',
+            #    QMessageBox.Ok)
         elif msg.startswith('ASK DEBRIS FIRST OV'):
             ov_index = int(msg[len('ASK DEBRIS FIRST OV'):])
             self.viewport.vp_show_overview_for_user_inspection(ov_index)
