@@ -319,7 +319,7 @@ class Microtome_katana(Microtome):
         self._send_command('KE')
         response = self._read_response()
         # response will look like 'KE:120000' (for position of 0.12mm)
-        response = response.rstrip();
+        response = response.rstrip()
         response = response.replace('KE:', '')
         try:
             z = int(response) / 1000
