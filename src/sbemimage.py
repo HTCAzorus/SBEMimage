@@ -13,8 +13,8 @@
 """sbemimage.py launches the application.
 
 First, the start-up dialog is shown (ConfigDlg in main_controls_dlg_windows.py),
-and the user is asked to select a user configuration file. The application
-attempts to load the user configuration file (.ini) and the associated system
+and the user is asked to select a session configuration. The application
+attempts to load the session configuration file (.ini) and the associated system
 configuration file (.cfg). If the configuration is loaded successfully, the
 QMainWindow MainControls (in main_controls.py) is launched.
 
@@ -46,7 +46,7 @@ from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import Qt
 
 from main_controls_dlg_windows import ConfigDlg
-from config_template import process_cfg, load_device_presets
+from config_template import process_cfg, load_device_presets, default_cfg_found
 from main_controls import MainControls
 import utils
 
@@ -55,7 +55,7 @@ import utils
 # master branch (for example, '2020.07 R2020-07-28'). For the current version
 # in the dev (development) branch, it must contain the tag 'dev'.
 # Following https://www.python.org/dev/peps/pep-0440/#public-version-identifiers
-VERSION = '2021.04 dev'
+VERSION = '2021.08 dev'
 
 
 # Hook for uncaught/Qt exceptions
@@ -138,8 +138,7 @@ def main():
         default_configuration, config, sysconfig = _load_config(config_file)
         configuration_loaded = True
 
-    elif (os.path.isfile(os.path.join(sbem_cfg_dir, 'default.ini'))
-            and os.path.isfile(os.path.join(sbem_cfg_dir, 'system.cfg'))):
+    if default_cfg_found():
         # Ask user to select .ini file
         startup_dialog = ConfigDlg(VERSION)
         startup_dialog.exec_()
@@ -149,11 +148,59 @@ def main():
             print('Program aborted by user.\n')
             sys.exit()
         else:
-            default_configuration, config, sysconfig = _load_config(config_file)
-            configuration_loaded = True
+            try:
+                # Attempt to load the configuration files and start up the app.
+                # Logging to central log file starts at this point.
+                if dlg_response == 'Default Configuration':
+                    default_configuration = True
+                    config_file = 'default.ini'
+                else:
+                    config_file = dlg_response
+                    
+                print(f'Loading configuration file {config_file} ...', end='')
+                config = ConfigParser()
+                if default_configuration:
+                    config_file_path = os.path.join('..', 'src', 'default_cfg', 
+                                                    config_file)
+                else:
+                    config_file_path = os.path.join('..', 'cfg', config_file)
+                with open(config_file_path, 'r') as file:
+                    config.read_file(file)
+                print(' Done.\n')
+
+                # Load associated system configuration file
+                sysconfig_file = config['sys']['sys_config_file']
+                if default_configuration and sysconfig_file != 'system.cfg':
+                    sysconfig_file = 'system.cfg'
+                    config['sys']['sys_config_file'] = 'system.cfg'
+                print(f'Loading system settings file {sysconfig_file} ...',
+                      end='')
+                sysconfig = ConfigParser()
+                if default_configuration:
+                    sysconfig_file_path = os.path.join('..', 'src', 'default_cfg', 
+                                                       sysconfig_file)
+                else:
+                    sysconfig_file_path = os.path.join('..', 'cfg', sysconfig_file)
+                with open(sysconfig_file_path, 'r') as file:
+                    sysconfig.read_file(file)
+                configuration_loaded = True
+                print(' Done.\n')
+                utils.log_info('CTRL', 
+                    f'Configuration files {config_file} and {sysconfig_file} '
+                    f'loaded.')
+            except Exception as e:
+                configuration_loaded = False
+                config_error = ('\nError while loading configuration! '
+                                'Program aborted.\n Exception: ' + str(e))
+                utils.log_error('CTRL', config_error)
+                print(config_error)
+                # Keep terminal window open when run from batch file
+                os.system('cmd /k')
+                sys.exit()
     else:
-        # Quit if default.ini doesn't exist
-        default_not_found = 'default.ini and/or system.cfg not found. Program aborted.\n'
+        # Quit if default configuration files in src\default_cfg not found
+        configuration_loaded = False
+        default_not_found = 'Default configuration missing or incomplete. Program aborted.\n'
         print(default_not_found)
         utils.log_error('CTRL', default_not_found)
         # os.system('cmd /k')
@@ -230,7 +277,7 @@ def main():
             if os.path.isfile('..\\cfg\\status.dat'):
                 os.remove('..\\cfg\\status.dat')
 
-            # Switch to dark style (experimental) if specified in user config
+            # Switch to dark style (experimental) if specified in session configuration
             if config['sys']['use_dark_mode_gui'].lower() == 'true':
                 import qdarkstyle
                 SBEMimage.setStyleSheet(qdarkstyle.load_stylesheet(qt_api='pyqt5'))

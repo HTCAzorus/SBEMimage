@@ -397,48 +397,45 @@ class MainControls(QMainWindow):
         print('\n\nReady.\n')
         self.set_statusbar('Ready.')
 
-        # If user has selected the default.ini configuration, provide some
-        # guidance
+        # If user has selected the default configuration and no custom system
+        # configuration files exist, provide guidance depending on whether presets
+        # were selected.
         if self.cfg_file == 'default.ini':
             # Check how many .cfg files exist
             cfgfile_counter = 0
             for file in os.listdir('..\\cfg'):
                 if file.endswith('.cfg'):
                     cfgfile_counter += 1
-            if cfgfile_counter > 2:
-                # Explain that default.ini will use the default system
-                # configuration.
-                QMessageBox.warning(
-                    self, 'Default user and system configuration',
-                    'You have selected default.ini to load SBEMimage, but '
-                    'there is at least one custom system configuration file '
-                    'available for this installation.\nPlease note that '
-                    'default.ini will use the unmodified default system '
-                    'configuration (system.cfg), in which no SEM/microtome '
-                    'models are specified.'
-                    '\n\nIf you want to create new user configuration files, '
-                    'you should first load a configuration other than '
-                    'default.ini.',
-                    QMessageBox.Ok)
-            elif self.simulation_mode:
-                # Show welcome message if SBEMimage is started with default.ini
-                # in simulation mode and no custom system configuration exists.
-                QMessageBox.information(
-                    self, 'Welcome to SBEMimage',
-                    'You can explore the user interface in simulation mode. If you '
-                    'want to get started with using SBEMimage on your '
-                    'SEM/microtome setup, save the current configuration '
-                    'under a new name. This will create a new custom user '
-                    'configuration file and a system configuration file:\n'
-                    'Menu  →  Configuration  →  Save as new configuration file'
-                    '\n\nThen leave the simulation mode:\n'
-                    'Menu  →  Configuration  →  Leave simulation mode'
-                    '\nRestart SBEMimage and load your new configuration file. '
-                    'Select your SEM and (optional) microtome model in '
-                    'the start-up dialog (button "SEM/microtome setup").'
-                    '\n\nFollow the instructions in the user guide '
-                    '(sbemimage.readthedocs.io) to calibrate your setup.',
-                    QMessageBox.Ok)
+            # Check if presets loaded 
+            presets_loaded = (self.syscfg['device']['sem'] != 'Unknown')
+
+            if cfgfile_counter == 0 and self.simulation_mode:
+                if presets_loaded:
+                    QMessageBox.information(
+                        self, 'Welcome to SBEMimage!',
+                        'You can explore the user interface in simulation mode. '
+                        '\n\nYou have selected device presets: The correct SEM model '
+                        'and (optional) microtome model should be displayed in the '
+                        'Main Controls window.'
+                        '\n\nGo to:\n'
+                        'Menu  →  Configuration  →  Save as new configuration file'
+                        '\nto create a custom session configuration and a system '
+                        'configuration file. '
+                        '\n\nThen leave simulation mode:\n'
+                        'Menu  →  Configuration  →  Leave simulation mode'
+                        '\nRestart SBEMimage and load your new configuration file. '
+                        '\n\nFollow the instructions in the user guide '
+                        '(sbemimage.readthedocs.io) to calibrate your setup.',
+                        QMessageBox.Ok)
+                else:
+                    QMessageBox.information(
+                        self, 'Welcome to SBEMimage!',
+                        'You can explore the user interface in simulation mode. '
+                        '\n\nPlease note that you have not selected any device '
+                        'presets.\nTo use SBEMimage on your SEM setup, please '
+                        'restart the software and click on the button '
+                        '"SEM/microtome setup" in the start-up dialog.',
+                        QMessageBox.Ok)
 
         if self.simulation_mode:
             utils.log_info('CTRL', 'Simulation mode active.')
@@ -861,7 +858,12 @@ class MainControls(QMainWindow):
             str(self.gm[self.grid_index_dropdown].number_active_tiles()))
         # Acquisition parameters
         self.lineEdit_baseDir.setText(self.acq.base_dir)
-        self.label_numberSlices.setText(str(self.acq.number_slices))
+        if self.acq.use_target_z_diff:
+            self.label_t.setText("Target Z depth (μm):")
+            self.label_target.setText(str(self.acq.target_z_diff))
+        else:
+            self.label_t.setText("Target number of slices:")
+            self.label_target.setText(str(self.acq.number_slices))
         if self.use_microtome:
             self.label_sliceThickness.setText(
                 str(self.acq.slice_thickness) + ' nm')
@@ -893,7 +895,7 @@ class MainControls(QMainWindow):
             f'{total_stage_moves/total_duration * 100:.1f}% / '
             f'{total_cutting/total_duration * 100:.1f}%)')
         self.label_totalArea.setText('{0:.1f}'.format(total_area) + ' µm²')
-        self.label_totalZ.setText('{0:.1f}'.format(total_z) + ' µm')
+        self.label_totalZ.setText('{0:.2f}'.format(total_z) + ' µm')
         self.label_totalData.setText('{0:.1f}'.format(total_data) + ' GB')
         days, hours, minutes = utils.get_days_hours_minutes(remaining_time)
         self.label_dateEstimate.setText(
@@ -1697,15 +1699,26 @@ class MainControls(QMainWindow):
 
     def show_stack_progress(self):
         current_slice = self.acq.slice_counter
-        if self.acq.number_slices > 0:
-            self.label_sliceCounter.setText(
-                str(current_slice) + '      (' + chr(8710) + 'Z = '
-                + '{0:.3f}'.format(self.acq.total_z_diff) + ' µm)')
+        total_z_diff = self.acq.total_z_diff
+
+        if self.acq.use_target_z_diff:
+            self.label_cp.setText("Current Z depth:")
+            self.label_currentPosition.setText(
+                '{0:.3f}'.format(total_z_diff) + ' µm' + '      (slice no. = '
+                + str(current_slice) + ")")
             self.progressBar.setValue(
-                current_slice / self.acq.number_slices * 100)
+                total_z_diff / self.acq.target_z_diff * 100)
         else:
-            self.label_sliceCounter.setText(
-                str(current_slice) + "      (no cut after acq.)")
+            self.label_cp.setText("Current slice:")
+            if self.acq.number_slices > 0:
+                self.label_currentPosition.setText(
+                    str(current_slice) + '      (' + chr(8710) + 'Z = '
+                    + '{0:.3f}'.format(self.acq.total_z_diff) + ' µm)')
+                self.progressBar.setValue(
+                    current_slice / self.acq.number_slices * 100)
+            else:
+                self.label_currentPosition.setText(
+                    str(current_slice) + "      (no cut after acq.)")
 
     def show_current_stage_xy(self):
         xy_pos = self.stage.last_known_xy
@@ -2468,7 +2481,7 @@ class MainControls(QMainWindow):
             self.pushButton_resetAcq.setEnabled(False)
             self.pushButton_pauseAcq.setEnabled(False)
             self.pushButton_startAcq.setEnabled(True)
-            self.label_sliceCounter.setText('---')
+            self.label_currentPosition.setText('---')
             self.progressBar.setValue(0)
             self.show_stack_acq_estimates()
             self.pushButton_startAcq.setText('START')
@@ -2634,7 +2647,7 @@ class MainControls(QMainWindow):
                     if result == QMessageBox.Yes:
                         self.save_acq_notes()
                 if self.acq.acq_paused:
-                    if not(self.cfg_file == 'default.ini'):
+                    if self.cfg_file != 'default.ini':
                         QMessageBox.information(
                             self, 'Resume acquisition later',
                             'The current acquisition is paused. The current '
@@ -2644,7 +2657,7 @@ class MainControls(QMainWindow):
                             'configuration file.',
                             QMessageBox.Ok)
                         self.save_config_to_disk(show_msg=True)
-                    else:
+                    elif self.syscfg['device']['sem'] != 'Unknown':
                         result = QMessageBox.question(
                             self, 'Save settings?',
                             'Do you want to save the current settings to a '
@@ -2653,7 +2666,7 @@ class MainControls(QMainWindow):
                         if result == QMessageBox.Yes:
                             self.open_save_settings_new_file_dlg()
                 else:
-                    if not(self.cfg_file == 'default.ini'):
+                    if self.cfg_file != 'default.ini':
                         result = QMessageBox.question(
                             self, 'Save settings?',
                             'Do you want to save the current settings '
@@ -2662,7 +2675,7 @@ class MainControls(QMainWindow):
                             QMessageBox.Yes| QMessageBox.No)
                         if result == QMessageBox.Yes:
                             self.save_config_to_disk(show_msg=True)
-                    else:
+                    elif self.syscfg['device']['sem'] != 'Unknown':
                         result = QMessageBox.question(
                             self, 'Save settings?',
                             'Do you want to save the current '

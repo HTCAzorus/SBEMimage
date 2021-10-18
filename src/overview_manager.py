@@ -253,7 +253,7 @@ class OverviewManager:
         self.template_ov_index = 0
         self.number_ov = int(self.cfg['overviews']['number_ov'])
 
-        # Load OV parameters from user configuration
+        # Load OV parameters from session configuration
         ov_active = json.loads(self.cfg['overviews']['ov_active'])
         ov_centre_sx_sy = json.loads(self.cfg['overviews']['ov_centre_sx_sy'])
         ov_rotation = json.loads(self.cfg['overviews']['ov_rotation'])
@@ -455,6 +455,15 @@ class OverviewManager:
                               frame_size=ov.frame_size, frame_size_selector=ov.frame_size_selector,
                               dwell_time_selector=ov.dwell_time_selector, dwell_time=ov.dwell_time,
                               acq_interval=ov.acq_interval, acq_interval_offset=ov.acq_interval_offset)
+
+    def overview_position_for_registration(self, ov_index):
+        """Provide overview location (upper left corner of overview) in nanometres.
+        TODO: What is the best way to deal with overview rotations?
+        """
+        dx, dy = self.__overviews[ov_index].centre_dx_dy
+        width_d = self.__overviews[ov_index].width_d()
+        height_d = self.__overviews[ov_index].height_d()
+        return int((dx - width_d/2) * 1000), int((dy - height_d/2) * 1000)
 
     def total_number_active_overviews(self):
         """Return the total number of active overviews."""

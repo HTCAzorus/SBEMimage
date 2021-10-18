@@ -70,9 +70,12 @@ class UpdateQThread(QThread):
 class ConfigDlg(QDialog):
     """Start-up dialog window that lets user select a configuration file.
 
-    The previously used configuration is preselected in the list widget. If no
-    previously used configuration can be found, use default.ini. If status.dat
-    does not exists, show warning message box.
+    The previously used configuration file is preselected in the list widget.
+    The option to load the default configuration (default.ini, system.cfg and
+    presets) is shown as "Default Configuration".
+    When "Default Configuration" is selected, clicking on "SEM/Microtome setup"
+    opens a secondary dialog window, in which the user can select device presets
+    for different SEM and microtome models including mocks.     
     """
 
     def __init__(self, VERSION):
@@ -96,11 +99,21 @@ class ConfigDlg(QDialog):
         self.pushButton_deviceSelection.clicked.connect(
            self.open_device_selection_dlg)
 
+        # If the 'cfg' folder does not exist yet (first start of SBEMimage),
+        # create it and put empty file 'status.dat' into it.
+        if not os.path.exists('..\\cfg'):
+            os.makedirs('..\\cfg')
+            open('..\\cfg\\status.dat', 'a').close()
+
         # Populate the list widget with existing .ini files
         inifile_list = []
         for file in os.listdir('..\\cfg'):
             if file.endswith('.ini'):
                 inifile_list.append(file)
+        # Create entry "Default Configuration". Selecting it will
+        # load default.ini, system.cfg, and presets
+        inifile_list.append('Default Configuration')
+
         self.listWidget_filelist.addItems(inifile_list)
         self.listWidget_filelist.itemSelectionChanged.connect(
             self.ini_file_selection_changed)
@@ -115,39 +128,31 @@ class ConfigDlg(QDialog):
                     last_inifile, Qt.MatchExactly)[0]
                 self.listWidget_filelist.setCurrentItem(last_item_used)
             except:
-                # If the file indicated in status.dat does not exist,
-                # select default.ini.
-                # This dialog is called from SBEMimage.py only if default.ini
-                # is found in cfg directory.
-                default_item = self.listWidget_filelist.findItems(
-                    'default.ini', Qt.MatchExactly)[0]
-                self.listWidget_filelist.setCurrentItem(default_item)
+                # If the file indicated in status.dat does not exist, select the
+                # first item of the list
+                self.listWidget_filelist.setCurrentRow(0)
         else:
             # If status.dat does not exist, the program must have crashed or a
-            # second instance is running. Preselect default.ini in the list,
-            # and display a warning. The warning is suppressed if
-            # inifile_list contains only default.ini.
-            default_item = self.listWidget_filelist.findItems(
-                'default.ini', Qt.MatchExactly)[0]
-            self.listWidget_filelist.setCurrentItem(default_item)
-            if len(inifile_list) > 1:
-                QMessageBox.warning(
-                    self, 'Warning: Crash occurred or other SBEMimage instance '
-                    'is running',
-                    'SBEMimage appears to have crashed during the '
-                    'previous run, or another instance of SBEMimage is already '
-                    'running. Please close the other instance or abort this '
-                    'one.\n\n'
-                    'If you want to continue an acquisition after a crash, '
-                    'double-check all settings before restarting!\n\n'
-                    'You can report a crash here, ideally with the error '
-                    'message(s) shown in the Console window: '
-                    'https://github.com/SBEMimage/SBEMimage/issues',
-                    QMessageBox.Ok)
+            # second instance is running. Select the first item of the list
+            # and display a warning.
+            self.listWidget_filelist.setCurrentRow(0)
+            QMessageBox.warning(
+                self, 'Warning: Crash occurred or other SBEMimage instance '
+                'is running',
+                'SBEMimage appears to have crashed during the '
+                'previous run, or another instance of SBEMimage is already '
+                'running. Please close the other instance or abort this '
+                'one.\n\n'
+                'If you want to continue an acquisition after a crash, '
+                'double-check all settings before restarting!\n\n'
+                'You can report a crash here, ideally with the error '
+                'message(s) shown in the Console window: '
+                'https://github.com/SBEMimage/SBEMimage/issues',
+                QMessageBox.Ok)
 
     def ini_file_selection_changed(self):
         # Enable device presets selection button if default.ini selected
-        if self.listWidget_filelist.currentItem().text() == 'default.ini':
+        if self.listWidget_filelist.currentItem().text() == 'Default Configuration':
             self.pushButton_deviceSelection.setEnabled(True)
         else:
             self.pushButton_deviceSelection.setEnabled(False)
@@ -186,7 +191,7 @@ class DeviceSelectionDlg(QDialog):
         self.show()
         syscfg = configparser.ConfigParser()
         try:
-            with open('..\\cfg\\system.cfg', 'r') as file:
+            with open('..\\src\\default_cfg\\system.cfg', 'r') as file:
                 syscfg.read_file(file)
         except Exception as e:
             QMessageBox.warning(
@@ -241,7 +246,7 @@ class DeviceSelectionDlg(QDialog):
 # ------------------------------------------------------------------------------
 
 class SaveConfigDlg(QDialog):
-    """Save current user configuration in a new config (.ini) file."""
+    """Save current session configuration in a new .ini file."""
 
     def __init__(self, syscfg_file='', new_syscfg=False):
         super().__init__()
@@ -260,15 +265,13 @@ class SaveConfigDlg(QDialog):
         # and enable lineEdit
         if new_syscfg:
             QMessageBox.information(
-                self, 'New user and system configuration',
-                'You are about to save a custom user configuation based '
+                self, 'New session and system configuration',
+                'You are about to save a custom session configuration based '
                 'on default.ini. Please also choose a name for your '
-                'system configuration in this dialog. The name you choose '
-                'will be used for all future user configurations '
-                'on this setup.\n\n'
-                'To create additional user configurations (after creating '
-                'this new one), please load any existing .ini file other than '
-                'default.ini and save it under a new name.',
+                'system configuration in this dialog.\n\n'
+                'To create additional session configuration files (after creating '
+                'this new one), please load an existing .ini file and save it ' 
+                'under a new name.',
                 QMessageBox.Ok)
             self.lineEdit_syscfgFileName.setEnabled(True)
             self.label_syscfgInput.setText(
@@ -297,7 +300,7 @@ class SaveConfigDlg(QDialog):
             success = False
             QMessageBox.warning(
                 self, 'Error',
-                'You cannot choose "default" for the user configuration or '
+                'You cannot choose "default" for the session configuration or '
                 '"system" for the system configuration.',
                 QMessageBox.Ok)
         # Check if files already exist
@@ -307,7 +310,7 @@ class SaveConfigDlg(QDialog):
                 success = False
                 QMessageBox.warning(
                     self, 'Error',
-                    'User configuration with that name already exists!',
+                    'Session configuration with that name already exists!',
                     QMessageBox.Ok)
             self.sysfile_name = self.lineEdit_syscfgFileName.text() + '.cfg'
             if self.new_syscfg and os.path.isfile(
@@ -1995,9 +1998,9 @@ class AcqSettingsDlg(QDialog):
         self.update_stack_name()
         self.new_base_dir = ''
         self.spinBox_sliceThickness.setValue(self.acq.slice_thickness)
-        self.spinBox_numberSlices.setValue(self.acq.number_slices)
+        self.update_target_settings()
         self.spinBox_sliceCounter.setValue(self.acq.slice_counter)
-        self.doubleSpinBox_zDiff.setValue(self.acq.total_z_diff)
+        self.doubleSpinBox_totalZDiff.setValue(self.acq.total_z_diff)
         self.checkBox_sendMetaData.setChecked(self.acq.send_metadata)
         self.update_server_lineedit()
         self.checkBox_sendMetaData.stateChanged.connect(
@@ -2011,7 +2014,7 @@ class AcqSettingsDlg(QDialog):
         # Disable two spinboxes when SEM stage used
         if not use_microtome:
             self.spinBox_sliceThickness.setEnabled(False)
-            self.doubleSpinBox_zDiff.setEnabled(False)
+            self.doubleSpinBox_totalZDiff.setEnabled(False)
 
     def select_directory(self):
         """Let user select the base directory for the stack acquisition.
@@ -2035,6 +2038,69 @@ class AcqSettingsDlg(QDialog):
     def update_stack_name(self):
         base_dir = self.lineEdit_baseDir.text().rstrip(r'\/ ')
         self.label_stackName.setText(base_dir[base_dir.rfind('\\') + 1:])
+
+    def update_target_settings(self):
+        if self.acq.use_target_z_diff:
+            self.comboBox_targetType.setCurrentIndex(1)
+            self.doubleSpinBox_targetZDiff.setValue(self.acq.target_z_diff)
+            self.update_number_slices()
+            self.spinBox_numberSlices.hide()
+        else:
+            self.comboBox_targetType.setCurrentIndex(0)
+            self.spinBox_numberSlices.setValue(self.acq.number_slices)
+            self.update_target_z_diff()
+            self.doubleSpinBox_targetZDiff.hide()
+        self.comboBox_targetType.currentIndexChanged.connect(self.switch_target_spinbox)
+
+    def update_target_z_diff(self):
+        if self.slices_valid(self.acq.slice_counter, self.acq.number_slices):
+            self.doubleSpinBox_targetZDiff.setValue(self.calculate_target_z_diff_from_number_slices())
+        else:
+            # If the slice values are invalid, just set the target z diff to the current total z diff
+            self.doubleSpinBox_targetZDiff.setValue(self.acq.total_z_diff)
+
+    def update_number_slices(self):
+        if self.z_diff_valid(self.acq.target_z_diff, self.acq.total_z_diff):
+            self.spinBox_numberSlices.setValue(self.calculate_number_slices_from_target_z_diff())
+        else:
+            # If Z diff values are invalid, just set the target number of slices to the current slice number
+            self.spinBox_numberSlices.setValue(self.acq.slice_counter)
+
+    def switch_target_spinbox(self):
+        """ When target number of slices is used, a QSpinbox with integer steps is used.
+        When target z diff is used, a QDoubleSpinbox with fractional steps is used.
+        """
+        slice_spin_box = self.spinBox_numberSlices
+        depth_spin_box = self.doubleSpinBox_targetZDiff
+        slice_spin_box.setVisible(not slice_spin_box.isVisible())
+        depth_spin_box.setVisible(not depth_spin_box.isVisible())
+
+    def calculate_number_slices_from_target_z_diff(self):
+        z_to_cut_in_nanometer = round(
+            (self.doubleSpinBox_targetZDiff.value() - self.doubleSpinBox_totalZDiff.value())*1000)
+        # always rounds down to nearest whole slice, as we don't want to exceed the target depth
+        n_slices_to_cut = math.floor(z_to_cut_in_nanometer/self.acq.slice_thickness)
+        total_n_slices = n_slices_to_cut + self.spinBox_sliceCounter.value()
+
+        return total_n_slices
+
+    def calculate_target_z_diff_from_number_slices(self):
+        # giving number_slices as 0, means just image current surface, so target z is same as total z
+        if self.acq.number_slices == 0:
+            return self.acq.total_z_diff
+        else:
+            n_slices = self.acq.number_slices - self.acq.slice_counter
+            slice_thickness_microns = self.acq.slice_thickness / 1000
+            target_z_diff = self.acq.total_z_diff + (n_slices * slice_thickness_microns)
+
+            return target_z_diff
+
+    def slices_valid(self, slice_counter, number_slices):
+        return slice_counter <= number_slices or number_slices == 0
+
+    def z_diff_valid(self, target_z_diff, total_z_diff):
+        # target must be high enough to allow at least one slice to be taken
+        return target_z_diff >= (total_z_diff + self.acq.slice_thickness/1000)
 
     def accept(self):
         success = True
@@ -2081,12 +2147,27 @@ class AcqSettingsDlg(QDialog):
             min_slice_thickness = 0
         if min_slice_thickness <= self.spinBox_sliceThickness.value() <= 200:
             self.acq.slice_thickness = self.spinBox_sliceThickness.value()
+
         number_slices = self.spinBox_numberSlices.value()
+        target_z_diff = self.doubleSpinBox_targetZDiff.value()
+        total_z_diff = self.doubleSpinBox_totalZDiff.value()
+        slice_counter = self.spinBox_sliceCounter.value()
+
+        # 0 index is target number of slices, 1 index is target z depth
+        self.acq.use_target_z_diff = self.comboBox_targetType.currentIndex() == 1
+        if not self.acq.use_target_z_diff and self.slices_valid(slice_counter, number_slices):
+            # Keep target z difference in sync, for readability of config file
+            target_z_diff = self.calculate_target_z_diff_from_number_slices()
+            self.acq.slice_counter = slice_counter
+            self.acq.total_z_diff = total_z_diff
+        elif self.acq.use_target_z_diff and self.z_diff_valid(target_z_diff, total_z_diff):
+            # Keep number of slices in sync, for readability of config file
+            number_slices = self.calculate_number_slices_from_target_z_diff()
+            self.acq.slice_counter = slice_counter
+            self.acq.total_z_diff = total_z_diff
         self.acq.number_slices = number_slices
-        if (self.spinBox_sliceCounter.value() <= number_slices
-            or number_slices == 0):
-            self.acq.slice_counter = self.spinBox_sliceCounter.value()
-        self.acq.total_z_diff = self.doubleSpinBox_zDiff.value()
+        self.acq.target_z_diff = target_z_diff
+
         self.acq.eht_off_after_stack = self.checkBox_EHTOff.isChecked()
         self.acq.send_metadata = self.checkBox_sendMetaData.isChecked()
         if self.checkBox_sendMetaData.isChecked():
@@ -2098,16 +2179,23 @@ class AcqSettingsDlg(QDialog):
                     'system configuration file.',
                     QMessageBox.Ok)
             self.acq.metadata_project_name = self.lineEdit_projectName.text()
-        if ((number_slices > 0)
-            and (self.spinBox_sliceCounter.value() > number_slices)):
-            QMessageBox.warning(
-                self, 'Error',
-                'Slice counter must be smaller than or equal to '
-                'target number of slices.', QMessageBox.Ok)
-            success = False
+        if self.acq.use_target_z_diff and not self.z_diff_valid(target_z_diff, total_z_diff):
+                QMessageBox.warning(
+                    self, 'Error',
+                    'Target Z depth must be larger than or equal to ' +
+                    chr(8710) + 'Z + the current slice thickness', QMessageBox.Ok)
+                success = False
+        elif not self.acq.use_target_z_diff and not self.slices_valid(slice_counter, number_slices):
+                QMessageBox.warning(
+                    self, 'Error',
+                    'Slice counter must be smaller than or equal to '
+                    'target number of slices.', QMessageBox.Ok)
+                success = False
         if success:
             self.acq.base_dir = modified_dir
-            if self.acq.number_slices > self.acq.slice_counter:
+            if not self.acq.use_target_z_diff and self.acq.number_slices > self.acq.slice_counter:
+                self.acq.stack_completed = False
+            elif self.acq.use_target_z_diff and self.z_diff_valid(self.acq.target_z_diff, self.acq.total_z_diff):
                 self.acq.stack_completed = False
             super().accept()
 
