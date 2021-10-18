@@ -7,6 +7,7 @@ __pycache__/
 .pytest_cache
 
 # Configuration files, except templates, device presets and installer.cfg
+cfg/
 *.ini
 *.cfg
 *.dat

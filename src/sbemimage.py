@@ -142,9 +142,9 @@ def main():
         # Ask user to select .ini file
         startup_dialog = ConfigDlg(VERSION)
         startup_dialog.exec_()
-        config_file = startup_dialog.get_ini_file()
+        dlg_response = startup_dialog.get_ini_file()
         device_presets_selection = startup_dialog.device_presets_selection
-        if config_file == 'abort':
+        if dlg_response == 'abort':
             print('Program aborted by user.\n')
             sys.exit()
         else:
