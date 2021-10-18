@@ -98,12 +98,7 @@ class SEM_SU7000(SEM):
         # the extcon functionality.
         try:
             self._su.sync('Scan.State', ScanState.Run)
-<<<<<<< HEAD
-        except SyntaxError:
-            # SEM HV is likely off.
-=======
         except SyntaxError: # SEM HV is likely off.
->>>>>>> 6db5057ac16b71f56e5fb6cb0cc8364b58247c3e
             log.warning(cp.y('Could not set Scan state, is HV on?'))
         self._su._debug_mode = True
         # Capture params have to be saved and set when the capture call is made
