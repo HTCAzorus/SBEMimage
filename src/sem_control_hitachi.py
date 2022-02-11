@@ -605,73 +605,68 @@ class SEM_SU7000(SEM):
         """
         Read X stage position (in micrometres) from SEM.
         """
-        return self._su.Stage.XY[0] * 0.001 # Convert from nm to μm
+        self.last_known_x, self.last_known_y = self._su.Stage.XY * 0.001 # Convert from nm to μm
+        return self.last_known_x
         
     def get_stage_y(self) -> float:
         """
         Read Y stage position (in micrometres) from SEM.
         """
-        return self._su.Stage.XY[1] * 0.001 # Convert from nm to μm
+        self.last_known_x, self.last_known_y = self._su.Stage.XY * 0.001 # Convert from nm to μm
+        return self.last_known_y
 
     def get_stage_z(self) -> float:
         """
         Read Z stage position (in micrometres) from SEM.
         """
-        return self._su.Stage.Z * 0.001 # convert from nm to to μm
+        self.last_known_z = self._su.Stage.Z * 0.001 # convert from nm to to μm
+        return self.last_known_z
 
     def get_stage_xy(self) -> Tuple[float]:
         """
         Read XY stage position (in micrometres) from SEM, return as tuple.
         """
-        xy = self._su.Stage.XY
-        # print(cp.g(f'Got XY = {xy} nm'))
-        xy *= 0.001  # convert from nm to to μm
-        return tuple(xy)
+        self.last_known_x, self.last_known_y = self._su.Stage.XY * 0.001 # Convert from nm to μm
+        return (self.last_known_x, self.last_known_y)
 
     def get_stage_xyz(self):
         """
         Read XYZ stage position (in micrometres) from SEM, return as tuple.
         """
-        xyz = self._su.Stage.XYZTR[0:3]
-        # print(cp.g(f'Got XYZ = {xyz} nm'))
-        xyz *=  0.001 # convert from nm to to μm
-        return tuple(xyz)
+        self.last_known_x, self.last_known_y, self.last_known_z = self._su.Stage.XYZTR[0:3] * 0.001 # Convert from nm to μm
+        return (self.last_known_x, self.last_known_y, self.last_known_z)
 
         
     def move_stage_to_x(self, x: float) -> None:
         """
         Move stage to coordinate x, provided in microns.
         """
-        x *= 1e3 # Convert to nm
-        # print(cp.b(f'Move stage-X to {x} nm'))
-        # Is supposed to be asynchronous?
-        self._su.sync('Stage.XY', (x, self._su.Stage.XY[1]))
+        self.last_known_x = x
+        self.last_known_y = self._su.Stage.XY[1]
+        self._su.sync('Stage.XY', (self.last_known_x * 1e3, self.last_known_y * 1e3))
 
     def move_stage_to_y(self, y: float) -> None:
         """
         Move stage to coordinate y, provided in microns.
         """
-        y *= 1e3 # Convert to nm
-        # Is supposed to be asynchronous?
-        # print(cp.b(f'Move stage-X to {y} nm'))
-        self._su.sync('Stage.XY', (self._su.Stage.XY[0], y))
+        self.last_known_y = y
+        self.last_known_x = self._su.Stage.XY[0]
+        self._su.sync('Stage.XY', (self.last_known_x * 1e3, self.last_known_y * 1e3))
 
     def move_stage_to_z(self, z: float) -> None:
         """
         Move stage to coordinate y, provided in microns.
         """
-        z *= 1e3 # Convert to nm
-        # Is supposed to be asynchronous?
-        self._su.sync('Stage.Z', z)
+        self.last_known_z = z
+        self._su.sync('Stage.Z', self.last_known_z * 1e3)
 
     def move_stage_to_xy(self, coordinates: Sequence[float]) -> None:
         """
         Move stage to coordinates x and y, provided as tuple or list
         in microns.
         """
-        coordinates = np.array(coordinates) * 1e3
-        # print(cp.b(f'Move stage to {coordinates} nm'))
-        self._su.sync('Stage.XY', coordinates)
+        self.last_known_x, self.last_known_y = coordinates
+        self._su.sync('Stage.XY', (self.last_known_x * 1e3, self.last_known_y * 1e3))
 
     # def stage_move_duration(self, from_x, from_y, to_x, to_y):
     #     """Calculate the duration of a stage move in seconds using the
