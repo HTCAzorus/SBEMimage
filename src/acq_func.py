@@ -25,7 +25,7 @@ from skimage import io
 
 import utils
 from utils import Error
-
+from sem_control import SEM
 
 def acquire_ov(base_dir, selection, sem, stage, ovm, img_inspector,
                main_controls_trigger, viewport_trigger):
@@ -204,7 +204,7 @@ def acquire_stub_ov(sem, stage, ovm, acq, img_inspector,
                     stub_dlg_trigger.transmit('DRAW VP')
                     save_path = os.path.join(
                         acq.base_dir, 'workspace',
-                        'stub' + str(tile_index).zfill(2) + '.tif')
+                        'stub' + str(tile_index).zfill(2) + SEM.EXT)
                     if first_tile:
                         # Set acquisition parameters
                         sem.apply_frame_settings(

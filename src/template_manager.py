@@ -157,8 +157,8 @@ class TemplateManager:
                 del out_
 
         # might be useful for GUI
-        # imageio.imsave(self.stub_ov_viewport_image[:-4] + '_MASK.tif', (out_scores > threshold).astype(np.uint16) * 255)
-        # imageio.imsave(self.stub_ov_viewport_image[:-4] + '_ANGLES.tif', (out_angles + 360).astype(np.uint16))
+        # imageio.imsave(self.stub_ov_viewport_image[:-4] + f'_MASK{SEM.EXT}', (out_scores > threshold).astype(np.uint16) * 255)
+        # imageio.imsave(self.stub_ov_viewport_image[:-4] + f'_ANGLES{SEM.EXT}', (out_angles + 360).astype(np.uint16))
 
         # Compute position of stub overview (upper left corner) and its
         # width and height

@@ -46,9 +46,10 @@ from PyQt5.QtWidgets import QApplication, QDialog, QMessageBox, \
 
 import utils
 from sem_control_mock import SEM_Mock
+from sem_control import SEM
 from utils import Error
 import acq_func
-
+import mncc
 
 class UpdateQThread(QThread):
     """Helper for updating QDialogs using QThread"""
@@ -997,7 +998,7 @@ class StageCalibrationDlg(QDialog):
         dwell_index = self.sem.DWELL_TIME.index(self.sem.grab_dwell_time)
         self.comboBox_dwellTime.setCurrentIndex(dwell_index)
         # TODO: use a list instead:
-        self.comboBox_package.addItems(['cv2', 'imreg_dft', 'skimage'])
+        self.comboBox_package.addItems(['cv2', 'imreg_dft', 'skimage', 'mncc'])
         self.pushButton_startImageAcq.clicked.connect(
             self.start_stage_calibration_procedure)
         if self.sem.simulation_mode:
@@ -1053,7 +1054,7 @@ class StageCalibrationDlg(QDialog):
             self, 'Stage calibration procedure',
             'If you click on "Start automatic calibration", '
             'three images will be acquired and saved in the current base '
-            'directory: start.tif, shift_x.tif, shift_y.tif. '
+            f'directory: start{SEM.EXT}, shift_x{SEM.EXT}, shift_y{SEM.EXT}. '
             'You can set the pixel size and dwell time for these images and '
             'specify how far the stage should move along the X and the Y axis. '
             'The X/Y moves must be small enough to allow some overlap between '
@@ -1068,8 +1069,8 @@ class StageCalibrationDlg(QDialog):
             'Angles and scale factors will then be computed from these '
             'shifts.\n\n'
             'Alternatively, you can manually provide the pixel shifts by '
-            'looking at the calibration images start.tif, shift_x.tif, and '
-            'shift_y.tif and measuring the difference (with ImageJ, for '
+            f'looking at the calibration images start{SEM.EXT}, shift_x{SEM.EXT}, and '
+            f'shift_y{SEM.EXT} and measuring the difference (with ImageJ, for '
             'example) in the XY pixel position for some feature in the image. '
             'Click on "Calculate" to calculate the calibration parameters '
             'from these shifts.',
@@ -1087,7 +1088,7 @@ class StageCalibrationDlg(QDialog):
         reply = QMessageBox.information(
             self, 'Start calibration procedure',
             'This will acquire three images and save them in the current base '
-            'directory: start.tif, shift_x.tif, shift_y.tif. '
+            f'directory: start{SEM.EXT}, shift_x{SEM.EXT}, shift_y{SEM.EXT}. '
             'Structure must be visible in the images, and the beam must be '
             'focused.\nThe current stage position will be used as the starting '
             'position. The recommended starting position is the centre of the '
@@ -1126,7 +1127,7 @@ class StageCalibrationDlg(QDialog):
         start_x, start_y = self.stage.get_xy()
         print(f'STARTING POSITION: {start_x, start_y}')
         # Acquire first image at starting position
-        self.sem.acquire_frame(self.base_dir + '\\start.tif')
+        self.sem.acquire_frame(self.base_dir + f'\\start{SEM.EXT}')
         # Shift along X stage
         print(f'APPLYING SHIFT OF {shift} to X')
         self.stage.move_to_xy((start_x + shift, start_y))
@@ -1134,19 +1135,19 @@ class StageCalibrationDlg(QDialog):
         # movement?
         # 
         # Second image, at new X position (Y unchanged from starting position)
-        self.sem.acquire_frame(self.base_dir + '\\shift_x.tif')
+        self.sem.acquire_frame(self.base_dir + f'\\shift_x{SEM.EXT}')
         # Shift along Y direction, X back to starting position
         self.stage.move_to_xy((start_x, start_y + shift))
         # Acquire third and final image, at new Y position
-        self.sem.acquire_frame(self.base_dir + '\\shift_y.tif')
+        self.sem.acquire_frame(self.base_dir + f'\\shift_y{SEM.EXT}')
         # Move back to starting position
         self.stage.move_to_xy((start_x, start_y))
         # Show in log that calculation begins now
         self.update_calc_trigger.signal.emit()
         # Load images and calculate shifts:
-        start_img = imread(os.path.join(self.base_dir, 'start.tif'), 1)
-        shift_x_img = imread(os.path.join(self.base_dir, 'shift_x.tif'), 1)
-        shift_y_img = imread(os.path.join(self.base_dir, 'shift_y.tif'), 1)
+        start_img = imread(os.path.join(self.base_dir, f'start{SEM.EXT}'), 1)
+        shift_x_img = imread(os.path.join(self.base_dir, f'shift_x{SEM.EXT}'), 1)
+        shift_y_img = imread(os.path.join(self.base_dir, f'shift_y{SEM.EXT}'), 1)
         self.calc_exception = None
         try:
             # # [::-1] to use x, y, z order
@@ -1161,9 +1162,15 @@ class StageCalibrationDlg(QDialog):
                     start_img, shift_x_img, filter_pcorr=3)['tvec'][::-1]
                 y_shift = translation(
                     start_img, shift_y_img, filter_pcorr=3)['tvec'][::-1]
-            else:  # use skimage.register_translation
+            elif self.comboBox_package.currentIndex() == 2: #skimage
                 x_shift = register_translation(start_img, shift_x_img)[0][::-1]
                 y_shift = register_translation(start_img, shift_y_img)[0][::-1]
+            elif self.comboBox_package.currentIndex() == 3: # mncc
+                # mask = np.ones_like(start_img)
+                mask = mncc.edge_mask(start_img, edge=(16, 16, 16, 16))
+                x_shift, xncc = mncc.realmncc(start_img, shift_x_img, mask_fixed=mask, subpix=4, overlap_ratio=0.1)
+                y_shift, yncc = mncc.realmncc(start_img, shift_y_img, mask_fixed=mask, subpix=4, overlap_ratio=0.1)
+
             x_shift = x_shift.astype(np.int)
             y_shift = y_shift.astype(np.int)
             self.x_shift_vector = [x_shift[0], x_shift[1]]
@@ -1220,16 +1227,16 @@ class StageCalibrationDlg(QDialog):
         pixel_size = self.spinBox_pixelsize.value()
 
         # Use absolute values for now, TODO: revisit for the Sigma stage
-        delta_xx, delta_xy = (
-            abs(self.x_shift_vector[0]), abs(self.x_shift_vector[1]))
-        delta_yx, delta_yy = (
-            abs(self.y_shift_vector[0]), abs(self.y_shift_vector[1]))
+        # delta_xx, delta_xy = (
+        #     abs(self.x_shift_vector[0]), abs(self.x_shift_vector[1]))
+        # delta_yx, delta_yy = (
+        #     abs(self.y_shift_vector[0]), abs(self.y_shift_vector[1]))
         # Rotation angles (in radians)
-        rot_x = atan(delta_xy/delta_xx)
-        rot_y = atan(delta_yx/delta_yy)
+        # rot_x = atan(delta_xy/delta_xx)
+        # rot_y = atan(delta_yx/delta_yy)
         # Scale factors
-        scale_x = shift / (sqrt(delta_xx**2 + delta_xy**2) * pixel_size / 1000)
-        scale_y = shift / (sqrt(delta_yx**2 + delta_yy**2) * pixel_size / 1000)
+        # scale_x = shift / (sqrt(delta_xx**2 + delta_xy**2) * pixel_size / 1000)
+        # scale_y = shift / (sqrt(delta_yx**2 + delta_yy**2) * pixel_size / 1000)
 
         # Alternative calc.
         x_abs = np.linalg.norm(self.x_shift_vector)
@@ -1243,8 +1250,8 @@ class StageCalibrationDlg(QDialog):
 
         # Alternative calc. with atan2
         # This only works if the reference vector is (0, 0)
-        rot2_x = atan2(self.x_shift_vector[1], self.x_shift_vector[0])
-        rot2_y = atan2(self.y_shift_vector[0], self.y_shift_vector[1])
+        # rot2_x = atan2(self.x_shift_vector[1], self.x_shift_vector[0])
+        # rot2_y = atan2(self.y_shift_vector[0], self.y_shift_vector[1])
 
         scale_x = scale_x_alt
         scale_y = scale_y_alt
@@ -3820,7 +3827,7 @@ class GrabFrameDlg(QDialog):
 
     def file_name_already_exists(self):
         if os.path.isfile(os.path.join(
-                self.acq.base_dir, self.file_name + '.tif')):
+                self.acq.base_dir, self.file_name + SEM.EXT)):
             QMessageBox.information(
                 self, 'File name already exists',
                 'A file with the same name already exists in the base '
@@ -3853,7 +3860,7 @@ class GrabFrameDlg(QDialog):
         time and GUI should not freeze.
         """
         self.scan_success = self.sem.acquire_frame(
-            self.acq.base_dir + '\\' + self.file_name + '.tif')
+            self.acq.base_dir + '\\' + self.file_name + SEM.EXT)
         self.finish_trigger.signal.emit()
 
     def scan_complete(self):
@@ -3870,7 +3877,7 @@ class GrabFrameDlg(QDialog):
                 self, 'Frame acquired',
                 'The image was acquired and saved as '
                 + self.file_name +
-                '.tif in the current base directory.',
+                f'{SEM.EXT} in the current base directory.',
                 QMessageBox.Ok)
         else:
             QMessageBox.warning(
@@ -3886,13 +3893,13 @@ class GrabFrameDlg(QDialog):
         if self.file_name_already_exists():
             return
         success = self.sem.save_frame(os.path.join(
-            self.acq.base_dir, self.file_name + '.tif'))
+            self.acq.base_dir, self.file_name + SEM.EXT))
         if success:
             utils.log_info('SEM', 'Single frame saved (Grab dialog).')
             QMessageBox.information(
                 self, 'Frame saved',
                 'The current image shown in SmartSEM was saved as '
-                + self.file_name + '.tif in the current base directory.',
+                + self.file_name + f'{SEM.EXT} in the current base directory.',
                 QMessageBox.Ok)
         else:
             QMessageBox.warning(

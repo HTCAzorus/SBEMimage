@@ -68,10 +68,12 @@ class SEM_SU7000(SEM):
     Class for remote SEM control of a Hitachi SU7000 using the HTC `hihi` 
     interface. 
     """
+    
 
 
     def __init__(self, config: ConfigParser, sysconfig: ConfigParser):
         SEM.__init__(self, config, sysconfig)
+        SEM.EXT = '.bmp'
 
         # WARNING: calls to `log` do not work until `hihi.HTCClient` is constructed
         if hihi is None:
@@ -166,6 +168,7 @@ class SEM_SU7000(SEM):
         """
         Read current EHT (in kV).
         """
+        print(f'get_eht returning: {self._su.Gun.HighVoltage}')
         return self._su.Gun.HighVoltage
 
     def set_eht(self, target_eht: float) -> None:
@@ -353,10 +356,11 @@ class SEM_SU7000(SEM):
         dwell_time:
             The pixel dwell time in μs
         """
+        # WARNING: must set frame size first as pixel size depends on frame size.
+        ret_val3 = self.set_frame_size(frame_size_selector) # Sets SEM store res
         ret_val1 = self.set_pixel_size(pixel_size)
         ret_val2 = self.set_dwell_time(dwell_time)          # Sets SEM scan rate
-        ret_val3 = self.set_frame_size(frame_size_selector) # Sets SEM store res
-
+        
         # Load cycle time/scan_period for current settings
         #     TODO: allow faster scans via Fast? 
         # self._scan_method = ScanMethod.Slow
@@ -380,6 +384,7 @@ class SEM_SU7000(SEM):
         """Set SEM to frame size specified by frame_size_selector."""
         try:
             self._scan_shape = valid_scan_shapes[frame_size_selector]
+            print(f'Set frame size to index {frame_size_selector} giving scan shape {self._scan_shape}')
         except IndexError:
             self.error_state = Error.frame_size
             self.error_info = f'{frame_size_selector} is not a valid shape index.'
@@ -409,6 +414,7 @@ class SEM_SU7000(SEM):
         """
         fov = self._su.scan_field_of_view # nm
         # self._scan_shape is the major (X-axis) only
+        print(f'get_pixel_size: ps: {fov[1] / self._scan_shape} from shape: {self._scan_shape} and fov {fov}')
         return fov[1] / self._scan_shape
 
     def set_pixel_size(self, pixel_size: float) -> None:
@@ -419,6 +425,7 @@ class SEM_SU7000(SEM):
         -------
         Depends on the scan shape being previously set.
         """
+        print(f'set_pixel_size: ps: {pixel_size} and shape: {self._scan_shape}')
         self._su.scan_field_of_view = pixel_size * self._scan_shape
 
     def get_scan_rate(self) -> int:
@@ -470,7 +477,7 @@ class SEM_SU7000(SEM):
         ----------
         save_path_filename
             The absolute path to which the file will be saved. Note that SU7000
-            always saves to '.bmp' so extensions such as '.tif' will be removed.
+            always saves to '.bmp'.
         extra_delay
             Not used.
         """
@@ -495,11 +502,10 @@ class SEM_SU7000(SEM):
             return False
         # self._su.Scan.State
         # SBEMImage doesn't use the returned value.
-        # However, SBEMImage expects all filenames to be .TIF extension, so 
-        # we load up the BMP and save as a TIFF.
+
         # (We could save micrograph directly too if it's not float32)
-        bmp_filename = path.splitext(save_path_filename)[0] + '.bmp'
-        imageio.imwrite(save_path_filename, imageio.imread(bmp_filename))
+        # bmp_filename = path.splitext(save_path_filename)[0] + '.bmp'
+        # imageio.imwrite(save_path_filename, imageio.imread(bmp_filename))
         return True
 
     def save_frame(self, save_path_filename: str) -> bool:
@@ -583,22 +589,22 @@ class SEM_SU7000(SEM):
         """
         Run Hitachi autofocus, break if it takes longer than 1 min.
         """
-        self._sy.sync('Autofocus.start')
+        self._su.sync('Autofocus.start')
         return True
 
     def run_autostig(self) -> bool:
         """
         Run Hitachi autostig, break if it takes longer than 1 min.
         """
-        self._sy.sync('Autostigma.start')
+        self._su.sync('Autostigma.start')
         return True
 
     def run_autofocus_stig(self) -> bool:
         """
         Run combined Hitachi autofocus and autostig, break if it takes longer than 1 min.
         """
-        self._sy.sync('Autofocus.start')
-        self._sy.sync('Autostigma.start')
+        self._su.sync('Autofocus.start')
+        self._su.sync('Autostigma.start')
         return True
 
     def get_stage_x(self) -> float:

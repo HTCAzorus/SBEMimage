@@ -2323,8 +2323,8 @@ class MainControls(QMainWindow):
     def debris_detection_test(self):
         # Uses overview images t1.tif and t2.tif in current base directory
         # to run the debris detection in the current detection area.
-        test_image1 = os.path.join(self.acq.base_dir, 't1.tif')
-        test_image2 = os.path.join(self.acq.base_dir, 't2.tif')
+        test_image1 = os.path.join(self.acq.base_dir, f't1{SEM.EXT}')
+        test_image2 = os.path.join(self.acq.base_dir, f't2{SEM.EXT}')
 
         if os.path.isfile(test_image1) and os.path.isfile(test_image2):
             self.img_inspector.process_ov(test_image1, 0, 0)
@@ -2348,8 +2348,8 @@ class MainControls(QMainWindow):
         else:
             QMessageBox.warning(
                 self, 'Debris detection test',
-                'This test expects two test overview images (t1.tif and '
-                't2.tif) in the current base directory.',
+                f'This test expects two test overview images (t1{SEM.EXT} and '
+                f't2{SEM.EXT}) in the current base directory.',
                 QMessageBox.Ok)
 
     def custom_test(self):

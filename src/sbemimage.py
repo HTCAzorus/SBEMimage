@@ -24,6 +24,7 @@ from typing import Tuple
 import os
 import sys
 import argparse
+import traceback
 
 # Required for version installed with pynsist installer
 if os.path.exists('..\\Python') and os.path.exists('..\\pkgs'):
@@ -294,6 +295,7 @@ def main():
                 sys.exit(SBEMimage.exec_())
             except Exception as e:
                 print('\nAn exception occurred during this SBEMimage session:\n')
+                traceback.print_exc()
                 utils.logger.propagate = True
                 utils.log_exception("Exception")
                 print('\nProgram aborted.')

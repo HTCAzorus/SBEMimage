@@ -33,6 +33,7 @@ from serial.tools import list_ports
 from PyQt5.QtCore import QObject, pyqtSignal
 
 
+
 # Default and minimum size of the Viewport canvas.
 VP_WIDTH = 1000
 VP_HEIGHT = 800
@@ -450,35 +451,39 @@ def ov_save_path(base_dir, stack_name, ov_index, slice_counter):
         base_dir, ov_relative_save_path(stack_name, ov_index, slice_counter))
 
 def ov_relative_save_path(stack_name, ov_index, slice_counter):
+    from sem_control import SEM # Avoid circular import
     return os.path.join(
         'overviews', 'ov' + str(ov_index).zfill(OV_DIGITS),
         stack_name + '_ov' + str(ov_index).zfill(OV_DIGITS)
-        + '_s' + str(slice_counter).zfill(SLICE_DIGITS) + '.tif')
+        + '_s' + str(slice_counter).zfill(SLICE_DIGITS) + SEM.EXT)
 
 def ov_debris_save_path(base_dir, stack_name, ov_index, slice_counter,
                         sweep_counter):
+    from sem_control import SEM # Avoid circular import
     return os.path.join(
         base_dir, 'overviews', 'debris',
         stack_name + '_ov' + str(ov_index).zfill(OV_DIGITS)
         + '_s' + str(slice_counter).zfill(SLICE_DIGITS)
-        + '_' + str(sweep_counter) + '.tif')
+        + '_' + str(sweep_counter) + SEM.EXT)
 
 def tile_relative_save_path(stack_name, grid_index, tile_index, slice_counter):
+    from sem_control import SEM # Avoid circular import
     return os.path.join(
         'tiles', 'g' + str(grid_index).zfill(GRID_DIGITS),
         't' + str(tile_index).zfill(TILE_DIGITS),
         stack_name + '_g' + str(grid_index).zfill(GRID_DIGITS)
         + '_t' + str(tile_index).zfill(TILE_DIGITS)
-        + '_s' + str(slice_counter).zfill(SLICE_DIGITS) + '.tif')
+        + '_s' + str(slice_counter).zfill(SLICE_DIGITS) + SEM.EXT)
 
 def rejected_tile_save_path(base_dir, stack_name, grid_index, tile_index,
                             slice_counter, fail_counter):
+    from sem_control import SEM # Avoid circular import
     return os.path.join(
         base_dir, 'tiles', 'rejected',
         stack_name + '_g' + str(grid_index).zfill(GRID_DIGITS)
         + '_t' + str(tile_index).zfill(TILE_DIGITS)
         + '_s' + str(slice_counter).zfill(SLICE_DIGITS)
-        + '_'  + str(fail_counter) + '.tif')
+        + '_'  + str(fail_counter) + SEM.EXT)
 
 def tile_preview_save_path(base_dir, grid_index, tile_index):
     return os.path.join(

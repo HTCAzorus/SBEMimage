@@ -3978,7 +3978,7 @@ class Viewport(QWidget):
         else:
             # Use current image from SEM 
             selected_file = os.path.join(
-                self.acq.base_dir, 'workspace', 'current_frame.tif')
+                self.acq.base_dir, 'workspace', f'current_frame{SEM.EXT}')
             self.sem.save_frame(selected_file)
             self.m_reset_view()
             self.m_tab_populated = False

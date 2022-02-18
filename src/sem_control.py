@@ -27,6 +27,10 @@ class SEM:
     Unimplemented methods raise a NotImplementedError - they must be implemented
     in child classes."""
 
+    # The file extension scans are saved with. Hitachi monkey-patches this in the 
+    # class __init__ to '.bmp'
+    EXT = '.tif' 
+
     def __init__(self, config, sysconfig):
         """Initialize SEM base class."""
         self.cfg = config  # user/project configuration (ConfigParser object)

@@ -258,7 +258,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>(.tif will be added automatically.)</string>
+    <string>(File extension will be added automatically.)</string>
    </property>
   </widget>
   <widget class="Line" name="line_2">
