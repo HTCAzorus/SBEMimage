@@ -62,6 +62,7 @@ _DWELL_MAP = { # (shape, dwell): period
     (5120,  50): 160,
     (5120, 100): 320
 }
+RC_RELAX = 0.25
 
 class SEM_SU7000(SEM):
     """
@@ -102,7 +103,7 @@ class SEM_SU7000(SEM):
             self._su.sync('Scan.State', ScanState.Run)
         except SyntaxError: # SEM HV is likely off.
             log.warning(cp.y('Could not set Scan state, is HV on?'))
-        self._su._debug_mode = True
+        # self._su._debug_mode = True
         # Capture params have to be saved and set when the capture call is made
         self._scan_method: ScanMethod = ScanMethod.Slow
         self._scan_shape: int = valid_scan_shapes[0]   # 640 x 480 pixels
@@ -342,6 +343,12 @@ class SEM_SU7000(SEM):
         # Set is not supported for objective aperture.
         return False
 
+    def apply_beam_settings(self):
+        """
+        Set the SEM to the current target EHT voltage and beam current.
+        """
+        return True
+
     def apply_frame_settings(self, frame_size_selector: int, pixel_size: float, 
                              dwell_time: float) -> bool:
         """
@@ -401,7 +408,11 @@ class SEM_SU7000(SEM):
         """
         Set SEM magnification to target_mag.
         """
+        old_mag = self._su.Mag
         self._su.sync('Mag', target_mag)
+        time.sleep(RC_RELAX)
+        new_mag = self._su.Mag
+        print(cp.r(f'  **** OLD_MAG: {old_mag}, TARGET: {target_mag}, ACTUAL: {new_mag} ****'))
 
     def get_pixel_size(self) -> None:
         """
@@ -414,7 +425,7 @@ class SEM_SU7000(SEM):
         """
         fov = self._su.scan_field_of_view # nm
         # self._scan_shape is the major (X-axis) only
-        print(f'get_pixel_size: ps: {fov[1] / self._scan_shape} from shape: {self._scan_shape} and fov {fov}')
+        # print(f'get_pixel_size: ps: {fov[1] / self._scan_shape} from shape: {self._scan_shape} and fov {fov}')
         return fov[1] / self._scan_shape
 
     def set_pixel_size(self, pixel_size: float) -> None:
@@ -425,8 +436,13 @@ class SEM_SU7000(SEM):
         -------
         Depends on the scan shape being previously set.
         """
-        print(f'set_pixel_size: ps: {pixel_size} and shape: {self._scan_shape}')
+        print(cp.r(f'set_pixel_size: ps: {pixel_size} and shape: {self._scan_shape}'))
+        old_mag = self._su.Mag
         self._su.scan_field_of_view = pixel_size * self._scan_shape
+        time.sleep(RC_RELAX)
+        new_mag = self._su.Mag
+        print(cp.y(f'  #### OLD_MAG: {old_mag}, TARGET PIXELSIZE: {pixel_size}, ACTUAL: {new_mag} ####'))
+
 
     def get_scan_rate(self) -> int:
         """
@@ -467,6 +483,7 @@ class SEM_SU7000(SEM):
         Set the scan rotation angle (in degrees). Valid range is `(-200°, 200°)`.
         """
         self._su.sync('Scan.Rotation', angle)
+        # self._su.Scan.Rotation = angle
 
     def acquire_frame(self, save_path_filename: str, extra_delay: float=0.0) -> bool:
         """
@@ -516,20 +533,21 @@ class SEM_SU7000(SEM):
         self.error_info = 'Unsupported: Hitachi SU7000 does not support saving current frame in GUI.'
         return False
 
-    def get_wd(self) -> float:
+    def get_wd(self) -> Tuple[float]:
         """
         Return current working distance (in meters).
         """
-        value = self._su.WD # mm
-        return value * 0.001 # convert from mm to m
+        # HHT uses actual objective coarse/fine values, not working distance, which is an
+        # entirely different parameter.
+        return self._su.Obj[0] * 1e-7 # nonsense units
 
-    def set_wd(self, target_wd: float) -> bool:
+    def set_wd(self, target_wd: Tuple[float]) -> bool:
         """
         Set working distance to target working distance (in meters)
         """
-        target_wd *= 1000 # convert m to mm
+        target_wd *= 1e7 # nonsense units
         try:
-            self._su.sync('WD', target_wd)
+            self._su.sync('Obj', (target_wd, 0.0))
         except Exception as e:
             self.error_state = Error.working_distance
             self.error_info = str(e)
@@ -589,6 +607,7 @@ class SEM_SU7000(SEM):
         """
         Run Hitachi autofocus, break if it takes longer than 1 min.
         """
+        print(cp.m(' ==== RUNNING AUTOFOCUS ===='))
         self._su.sync('Autofocus.start')
         return True
 

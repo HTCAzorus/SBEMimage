@@ -1,6 +1,6 @@
 @echo off
 rem The current directory (where this batch file is located) must be the SBEMimage installation directory.
-call activate env_sbem
+call activate azorus_dev
 cd src
 IF EXIST ..\Python\ (
 	rem Run python installed by NSIS installer.

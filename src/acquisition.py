@@ -2713,6 +2713,7 @@ class Acquisition:
         else:
             self.error_state = Error.autofocus_smartsem  # TODO: check if that code makes sense here
             return
+        
         utils.log_info(*autofocus_msg)
         self.add_to_main_log(autofocus_msg[0] + ': ' + autofocus_msg[1])
         if 'ERROR' in autofocus_msg[1]:
@@ -2729,7 +2730,14 @@ class Acquisition:
             self.gm[grid_index][tile_index].wd = self.sem.get_wd()
             self.gm[grid_index][tile_index].stig_xy = list(
                 self.sem.get_stig_xy())
-            msg = f'Finished MAPFoSt AF procedure for tile {grid_index}.{tile_index} with final WD/STIG_X/Y: ' \
+
+            af_method_str = 'unknown'
+            if self.autofocus.method == 0:
+                af_method_str = 'SmartSEM'
+            elif self.autofocus.method == 3:
+                af_method_str = 'MAPFoSt A'
+
+            msg = f'Finished {af_method_str} procedure for tile {grid_index}.{tile_index} with final WD/STIG_X/Y: ' \
                   f'{self.gm[grid_index][tile_index].wd*1000:.4f}, {self.gm[grid_index][tile_index].stig_xy[0]:.4f},' \
                   f' {self.gm[grid_index][tile_index].stig_xy[1]:.4f}'
             utils.log_info('SEM', msg)
